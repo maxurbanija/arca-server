@@ -62,8 +62,6 @@ app.use(errorHandler);
 app.listen(config.port, () => {
   console.log(`[Server] ARCA Server running on port ${config.port}`);
   console.log(`[Server] Environment: ${config.afip.production ? 'PRODUCTION' : 'HOMOLOGATION'}`);
-  console.log(`[Server] WSFE URL: ${config.afip.wsfeUrl}`);
-  console.log(`[Server] WSAA URL: ${config.afip.wsaaUrl}`);
 });
 
 export default app;

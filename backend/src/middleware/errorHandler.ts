@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ArcaAuthError, ArcaWSFEError, ArcaSoapError, ArcaError } from '@ramiidv/arca-sdk';
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -45,6 +46,43 @@ export function errorHandler(
       });
       return;
     }
+  }
+
+  // ARCA SDK errors
+  if (err instanceof ArcaAuthError) {
+    res.status(503).json({
+      success: false,
+      error: 'AFIP authentication failed',
+      details: err.message,
+    });
+    return;
+  }
+
+  if (err instanceof ArcaWSFEError) {
+    res.status(400).json({
+      success: false,
+      error: 'AFIP rejected the request',
+      details: err.errors,
+    });
+    return;
+  }
+
+  if (err instanceof ArcaSoapError) {
+    const status = err.statusCode || 502;
+    res.status(status).json({
+      success: false,
+      error: 'AFIP service unavailable',
+      details: err.message,
+    });
+    return;
+  }
+
+  if (err instanceof ArcaError) {
+    res.status(400).json({
+      success: false,
+      error: err.message,
+    });
+    return;
   }
 
   // Zod validation errors

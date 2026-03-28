@@ -49,6 +49,50 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+const createNotaCreditoSchema = z.object({
+  originalInvoiceId: z.number().int().positive(),
+  puntoVenta: z.number().int().positive(),
+  concepto: z.number().int().min(1).max(3).optional(),
+  items: z
+    .array(
+      z.object({
+        description: z.string().min(1, 'Item description is required'),
+        quantity: z.number().positive('Quantity must be positive'),
+        unitPrice: z.number().min(0, 'Unit price must be non-negative'),
+        ivaId: z.number().refine((v) => (VALID_IVA_IDS as readonly number[]).includes(v), {
+          message: `ivaId must be one of: ${VALID_IVA_IDS.join(', ')}`,
+        }),
+      })
+    )
+    .min(1, 'At least one item is required'),
+  fchServDesde: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  fchServHasta: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  fchVtoPago: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  observations: z.string().optional(),
+});
+
+// POST /nota-credito - Create credit note
+router.post('/nota-credito', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = createNotaCreditoSchema.parse(req.body);
+    const result = await invoiceService.createNotaCredito(data);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /nota-debito - Create debit note
+router.post('/nota-debito', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = createNotaCreditoSchema.parse(req.body);
+    const result = await invoiceService.createNotaDebito(data);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /stats - Dashboard stats (must be before /:id)
 router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -81,7 +125,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // GET /:id - Get invoice detail
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ success: false, error: 'Invalid invoice ID' });
       return;

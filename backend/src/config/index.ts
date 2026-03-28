@@ -27,8 +27,6 @@ function getEnvInt(key: string, defaultValue: number): number {
   return parsed;
 }
 
-const isProduction = getEnvBool('AFIP_PRODUCTION', false);
-
 export const config = {
   port: getEnvInt('PORT', 3001),
   databaseUrl: getEnv('DATABASE_URL', 'postgresql://localhost:5432/arca'),
@@ -39,13 +37,7 @@ export const config = {
     certPath: getEnv('AFIP_CERT_PATH', path.resolve(__dirname, '../../certs/cert.crt')),
     keyPath: getEnv('AFIP_KEY_PATH', path.resolve(__dirname, '../../certs/key.key')),
     puntoVenta: getEnvInt('AFIP_PUNTO_VENTA', 1),
-    production: isProduction,
-    wsaaUrl: isProduction
-      ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
-      : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
-    wsfeUrl: isProduction
-      ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL'
-      : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL',
+    production: getEnvBool('AFIP_PRODUCTION', false),
   },
 };
 

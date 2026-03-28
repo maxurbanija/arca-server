@@ -1,20 +1,11 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { format } from 'date-fns';
+import { Arca, IVA_RATES, Concepto, CbteTipo } from '@ramiidv/arca-sdk';
+import type { FacturarOpts, LineItem, FacturaResult } from '@ramiidv/arca-sdk';
+import { arca } from './arca.service';
 import { config } from '../config';
-import { wsfeService, CAERequestData } from './wsfe.service';
 import { AppError } from '../middleware/errorHandler';
 
 const prisma = new PrismaClient();
-
-// IVA rate mapping: AFIP IVA ID -> percentage
-const IVA_RATES: Record<number, number> = {
-  3: 0,      // 0%
-  4: 10.5,   // 10.5%
-  5: 21,     // 21%
-  6: 27,     // 27%
-  8: 5,      // 5%
-  9: 2.5,    // 2.5%
-};
 
 interface InvoiceItemInput {
   description: string;
@@ -37,6 +28,28 @@ interface CreateInvoiceInput {
   observations?: string;
 }
 
+interface CreateNotaCreditoInput {
+  originalInvoiceId: number;
+  puntoVenta: number;
+  concepto?: number;
+  items: InvoiceItemInput[];
+  fchServDesde?: string;
+  fchServHasta?: string;
+  fchVtoPago?: string;
+  observations?: string;
+}
+
+interface CreateNotaDebitoInput {
+  originalInvoiceId: number;
+  puntoVenta: number;
+  concepto?: number;
+  items: InvoiceItemInput[];
+  fchServDesde?: string;
+  fchServHasta?: string;
+  fchVtoPago?: string;
+  observations?: string;
+}
+
 interface InvoiceFilters {
   page?: number;
   limit?: number;
@@ -50,23 +63,14 @@ function roundTwo(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function calculateIvaFromItems(items: InvoiceItemInput[]) {
-  const ivaGroups: Record<number, { baseImp: number; importe: number }> = {};
-
-  const processedItems = items.map((item) => {
-    const ivaRate = IVA_RATES[item.ivaId];
+function processItemsForDB(items: InvoiceItemInput[]) {
+  return items.map((item) => {
+    const ivaRate = IVA_RATES[item.ivaId as keyof typeof IVA_RATES];
     if (ivaRate === undefined) {
       throw new AppError(400, `Invalid IVA ID: ${item.ivaId}. Valid IDs: ${Object.keys(IVA_RATES).join(', ')}`);
     }
-
     const subtotal = roundTwo(item.quantity * item.unitPrice);
     const ivaAmount = roundTwo(subtotal * (ivaRate / 100));
-
-    if (!ivaGroups[item.ivaId]) {
-      ivaGroups[item.ivaId] = { baseImp: 0, importe: 0 };
-    }
-    ivaGroups[item.ivaId].baseImp = roundTwo(ivaGroups[item.ivaId].baseImp + subtotal);
-    ivaGroups[item.ivaId].importe = roundTwo(ivaGroups[item.ivaId].importe + ivaAmount);
 
     return {
       description: item.description,
@@ -78,113 +82,94 @@ function calculateIvaFromItems(items: InvoiceItemInput[]) {
       ivaAmount,
     };
   });
-
-  const alicIva = Object.entries(ivaGroups)
-    .filter(([_, group]) => group.baseImp > 0)
-    .map(([id, group]) => ({
-      Id: parseInt(id),
-      BaseImp: group.baseImp,
-      Importe: group.importe,
-    }));
-
-  const impNeto = roundTwo(
-    processedItems.reduce((sum, item) => sum + item.subtotal, 0)
-  );
-  const impIVA = roundTwo(
-    processedItems.reduce((sum, item) => sum + item.ivaAmount, 0)
-  );
-  const impTotal = roundTwo(impNeto + impIVA);
-
-  return {
-    processedItems,
-    alicIva,
-    impNeto,
-    impIVA,
-    impTotal,
-    impTotConc: 0,
-    impOpEx: 0,
-    impTrib: 0,
-  };
 }
 
 class InvoiceService {
   async createInvoice(data: CreateInvoiceInput) {
-    const concepto = data.concepto ?? 2;
-    const puntoVenta = data.puntoVenta;
-    const cbteTipo = data.cbteTipo;
+    const processedItems = processItemsForDB(data.items);
 
-    // Get the last authorized voucher number
-    const lastVoucher = await wsfeService.getLastVoucher(puntoVenta, cbteTipo);
-    const nextCbteNro = lastVoucher.CbteNro + 1;
+    const lineItems: LineItem[] = processedItems.map((item) => ({
+      neto: item.subtotal,
+      iva: item.ivaId,
+    }));
 
-    // Calculate amounts from items
-    const calculated = calculateIvaFromItems(data.items);
+    const concepto = data.concepto ?? Concepto.SERVICIOS;
+    const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
+    const today = Arca.formatDate(new Date());
 
-    // Format date as YYYYMMDD
-    const cbteFch = format(new Date(), 'yyyyMMdd');
-
-    // Build service dates for concepto 2
-    const fchServDesde = data.fchServDesde || cbteFch;
-    const fchServHasta = data.fchServHasta || cbteFch;
-    const fchVtoPago = data.fchVtoPago || cbteFch;
-
-    // Build CAE request
-    const caeRequest: CAERequestData = {
-      CbteTipo: cbteTipo,
-      PtoVta: puntoVenta,
-      Concepto: concepto,
-      DocTipo: data.docTipo,
-      DocNro: data.docNro,
-      CbteDesde: nextCbteNro,
-      CbteHasta: nextCbteNro,
-      CbteFch: cbteFch,
-      ImpTotal: calculated.impTotal,
-      ImpTotConc: calculated.impTotConc,
-      ImpNeto: calculated.impNeto,
-      ImpOpEx: calculated.impOpEx,
-      ImpIVA: calculated.impIVA,
-      ImpTrib: calculated.impTrib,
-      FchServDesde: fchServDesde,
-      FchServHasta: fchServHasta,
-      FchVtoPago: fchVtoPago,
-      MonId: 'PES',
-      MonCotiz: 1,
-      Iva: calculated.alicIva,
+    const opts: FacturarOpts = {
+      ptoVta: data.puntoVenta,
+      cbteTipo: data.cbteTipo,
+      items: lineItems,
+      concepto,
+      docTipo: data.docTipo,
+      docNro: Number(data.docNro),
+      ...(esServicio && {
+        servicio: {
+          desde: data.fchServDesde || today,
+          hasta: data.fchServHasta || today,
+          vtoPago: data.fchVtoPago || today,
+        },
+      }),
     };
 
-    // Request CAE from AFIP
-    const caeResponse = await wsfeService.requestCAE(caeRequest);
+    const result = await arca.facturar(opts);
 
-    // Save invoice to database
+    if (!result.aprobada) {
+      const obsMsg = result.observaciones.length > 0
+        ? result.observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ')
+        : 'Unknown reason';
+      throw new AppError(400, `AFIP rejected invoice: ${obsMsg}`);
+    }
+
+    let qrUrl: string | undefined;
+    if (result.cae) {
+      const cbteFchFormatted = `${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}`;
+      qrUrl = Arca.generateQRUrl({
+        fecha: cbteFchFormatted,
+        cuit: Number(config.afip.cuit),
+        ptoVta: result.ptoVta,
+        tipoCmp: result.cbteTipo,
+        nroCmp: result.cbteNro,
+        importe: result.importes.total,
+        moneda: 'PES',
+        ctz: 1,
+        tipoDocRec: data.docTipo,
+        nroDocRec: Number(data.docNro),
+        codAut: Number(result.cae),
+      });
+    }
+
     const invoice = await prisma.invoice.create({
       data: {
-        cbteTipo,
-        puntoVenta,
-        cbteNro: nextCbteNro,
-        cbteDesde: caeResponse.cbteDesde,
-        cbteHasta: caeResponse.cbteHasta,
-        cbteFch,
+        cbteTipo: result.cbteTipo,
+        puntoVenta: result.ptoVta,
+        cbteNro: result.cbteNro,
+        cbteDesde: result.cbteNro,
+        cbteHasta: result.cbteNro,
+        cbteFch: today,
         concepto,
         docTipo: data.docTipo,
         docNro: data.docNro,
-        impTotal: new Prisma.Decimal(calculated.impTotal),
-        impTotConc: new Prisma.Decimal(calculated.impTotConc),
-        impNeto: new Prisma.Decimal(calculated.impNeto),
-        impOpEx: new Prisma.Decimal(calculated.impOpEx),
-        impIVA: new Prisma.Decimal(calculated.impIVA),
-        impTrib: new Prisma.Decimal(calculated.impTrib),
-        cae: caeResponse.cae,
-        caeFchVto: caeResponse.caeFchVto,
-        resultado: caeResponse.resultado,
+        impTotal: new Prisma.Decimal(result.importes.total),
+        impTotConc: new Prisma.Decimal(result.importes.noGravado),
+        impNeto: new Prisma.Decimal(result.importes.neto),
+        impOpEx: new Prisma.Decimal(result.importes.exento),
+        impIVA: new Prisma.Decimal(result.importes.iva),
+        impTrib: new Prisma.Decimal(result.importes.tributos),
+        cae: result.cae || '',
+        caeFchVto: result.caeVencimiento || '',
+        resultado: result.aprobada ? 'A' : 'R',
         monId: 'PES',
         monCotiz: new Prisma.Decimal(1),
-        fchServDesde,
-        fchServHasta,
-        fchVtoPago,
+        fchServDesde: data.fchServDesde || (esServicio ? today : undefined),
+        fchServHasta: data.fchServHasta || (esServicio ? today : undefined),
+        fchVtoPago: data.fchVtoPago || (esServicio ? today : undefined),
+        qrUrl: qrUrl || null,
         clientId: data.clientId || null,
         observations: data.observations || null,
         items: {
-          create: calculated.processedItems.map((item) => ({
+          create: processedItems.map((item) => ({
             description: item.description,
             quantity: new Prisma.Decimal(item.quantity),
             unitPrice: new Prisma.Decimal(item.unitPrice),
@@ -204,10 +189,223 @@ class InvoiceService {
     return {
       invoice,
       afipResponse: {
-        cae: caeResponse.cae,
-        caeFchVto: caeResponse.caeFchVto,
-        resultado: caeResponse.resultado,
-        observaciones: caeResponse.observaciones,
+        cae: result.cae,
+        caeFchVto: result.caeVencimiento,
+        resultado: result.aprobada ? 'A' : 'R',
+        observaciones: result.observaciones,
+        qrUrl,
+      },
+    };
+  }
+
+  async createNotaCredito(data: CreateNotaCreditoInput) {
+    const originalInvoice = await prisma.invoice.findUnique({
+      where: { id: data.originalInvoiceId },
+      include: { items: true },
+    });
+
+    if (!originalInvoice) {
+      throw new AppError(404, `Original invoice with ID ${data.originalInvoiceId} not found`);
+    }
+
+    if (!originalInvoice.cae) {
+      throw new AppError(400, 'Original invoice has no CAE, cannot create credit note');
+    }
+
+    const processedItems = processItemsForDB(data.items);
+    const lineItems: LineItem[] = processedItems.map((item) => ({
+      neto: item.subtotal,
+      iva: item.ivaId,
+    }));
+
+    const concepto = data.concepto ?? originalInvoice.concepto;
+    const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
+    const today = Arca.formatDate(new Date());
+
+    const result = await arca.notaCredito({
+      ptoVta: data.puntoVenta,
+      comprobanteOriginal: {
+        tipo: originalInvoice.cbteTipo,
+        ptoVta: originalInvoice.puntoVenta,
+        nro: originalInvoice.cbteNro,
+      },
+      items: lineItems,
+      concepto,
+      docTipo: originalInvoice.docTipo,
+      docNro: Number(originalInvoice.docNro),
+      ...(esServicio && {
+        servicio: {
+          desde: data.fchServDesde || today,
+          hasta: data.fchServHasta || today,
+          vtoPago: data.fchVtoPago || today,
+        },
+      }),
+    });
+
+    return this.saveComprobante(result, processedItems, {
+      docTipo: originalInvoice.docTipo,
+      docNro: originalInvoice.docNro,
+      concepto,
+      esServicio,
+      today,
+      clientId: originalInvoice.clientId,
+      observations: data.observations,
+      fchServDesde: data.fchServDesde,
+      fchServHasta: data.fchServHasta,
+      fchVtoPago: data.fchVtoPago,
+    });
+  }
+
+  async createNotaDebito(data: CreateNotaDebitoInput) {
+    const originalInvoice = await prisma.invoice.findUnique({
+      where: { id: data.originalInvoiceId },
+      include: { items: true },
+    });
+
+    if (!originalInvoice) {
+      throw new AppError(404, `Original invoice with ID ${data.originalInvoiceId} not found`);
+    }
+
+    if (!originalInvoice.cae) {
+      throw new AppError(400, 'Original invoice has no CAE, cannot create debit note');
+    }
+
+    const processedItems = processItemsForDB(data.items);
+    const lineItems: LineItem[] = processedItems.map((item) => ({
+      neto: item.subtotal,
+      iva: item.ivaId,
+    }));
+
+    const concepto = data.concepto ?? originalInvoice.concepto;
+    const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
+    const today = Arca.formatDate(new Date());
+
+    const result = await arca.notaDebito({
+      ptoVta: data.puntoVenta,
+      comprobanteOriginal: {
+        tipo: originalInvoice.cbteTipo,
+        ptoVta: originalInvoice.puntoVenta,
+        nro: originalInvoice.cbteNro,
+      },
+      items: lineItems,
+      concepto,
+      docTipo: originalInvoice.docTipo,
+      docNro: Number(originalInvoice.docNro),
+      ...(esServicio && {
+        servicio: {
+          desde: data.fchServDesde || today,
+          hasta: data.fchServHasta || today,
+          vtoPago: data.fchVtoPago || today,
+        },
+      }),
+    });
+
+    return this.saveComprobante(result, processedItems, {
+      docTipo: originalInvoice.docTipo,
+      docNro: originalInvoice.docNro,
+      concepto,
+      esServicio,
+      today,
+      clientId: originalInvoice.clientId,
+      observations: data.observations,
+      fchServDesde: data.fchServDesde,
+      fchServHasta: data.fchServHasta,
+      fchVtoPago: data.fchVtoPago,
+    });
+  }
+
+  private async saveComprobante(
+    result: FacturaResult,
+    processedItems: ReturnType<typeof processItemsForDB>,
+    meta: {
+      docTipo: number;
+      docNro: string;
+      concepto: number;
+      esServicio: boolean;
+      today: string;
+      clientId: number | null;
+      observations?: string;
+      fchServDesde?: string;
+      fchServHasta?: string;
+      fchVtoPago?: string;
+    },
+  ) {
+    if (!result.aprobada) {
+      const obsMsg = result.observaciones.length > 0
+        ? result.observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ')
+        : 'Unknown reason';
+      throw new AppError(400, `AFIP rejected comprobante: ${obsMsg}`);
+    }
+
+    let qrUrl: string | undefined;
+    if (result.cae) {
+      const cbteFchFormatted = `${meta.today.slice(0, 4)}-${meta.today.slice(4, 6)}-${meta.today.slice(6, 8)}`;
+      qrUrl = Arca.generateQRUrl({
+        fecha: cbteFchFormatted,
+        cuit: Number(config.afip.cuit),
+        ptoVta: result.ptoVta,
+        tipoCmp: result.cbteTipo,
+        nroCmp: result.cbteNro,
+        importe: result.importes.total,
+        moneda: 'PES',
+        ctz: 1,
+        tipoDocRec: meta.docTipo,
+        nroDocRec: Number(meta.docNro),
+        codAut: Number(result.cae),
+      });
+    }
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        cbteTipo: result.cbteTipo,
+        puntoVenta: result.ptoVta,
+        cbteNro: result.cbteNro,
+        cbteDesde: result.cbteNro,
+        cbteHasta: result.cbteNro,
+        cbteFch: meta.today,
+        concepto: meta.concepto,
+        docTipo: meta.docTipo,
+        docNro: meta.docNro,
+        impTotal: new Prisma.Decimal(result.importes.total),
+        impTotConc: new Prisma.Decimal(result.importes.noGravado),
+        impNeto: new Prisma.Decimal(result.importes.neto),
+        impOpEx: new Prisma.Decimal(result.importes.exento),
+        impIVA: new Prisma.Decimal(result.importes.iva),
+        impTrib: new Prisma.Decimal(result.importes.tributos),
+        cae: result.cae || '',
+        caeFchVto: result.caeVencimiento || '',
+        resultado: 'A',
+        monId: 'PES',
+        monCotiz: new Prisma.Decimal(1),
+        fchServDesde: meta.fchServDesde || (meta.esServicio ? meta.today : undefined),
+        fchServHasta: meta.fchServHasta || (meta.esServicio ? meta.today : undefined),
+        fchVtoPago: meta.fchVtoPago || (meta.esServicio ? meta.today : undefined),
+        qrUrl: qrUrl || null,
+        clientId: meta.clientId,
+        observations: meta.observations || null,
+        items: {
+          create: processedItems.map((item) => ({
+            description: item.description,
+            quantity: new Prisma.Decimal(item.quantity),
+            unitPrice: new Prisma.Decimal(item.unitPrice),
+            ivaId: item.ivaId,
+            ivaRate: new Prisma.Decimal(item.ivaRate),
+            subtotal: new Prisma.Decimal(item.subtotal),
+            ivaAmount: new Prisma.Decimal(item.ivaAmount),
+          })),
+        },
+      },
+      include: { items: true, client: true },
+    });
+
+    return {
+      invoice,
+      afipResponse: {
+        cae: result.cae,
+        caeFchVto: result.caeVencimiento,
+        resultado: 'A',
+        observaciones: result.observaciones,
+        qrUrl,
       },
     };
   }

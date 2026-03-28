@@ -76,6 +76,7 @@ model Invoice {
   clientId     Int?
   client       Client?       @relation(fields: [clientId], references: [id])
   items        InvoiceItem[]
+  qrUrl        String?
   observations String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
