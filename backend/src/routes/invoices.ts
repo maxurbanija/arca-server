@@ -1,0 +1,97 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import { invoiceService } from '../services/invoice.service';
+
+const router = Router();
+
+const VALID_CBTE_TIPOS = [1, 2, 3, 6, 7, 8, 11, 12, 13] as const;
+const VALID_IVA_IDS = [3, 4, 5, 6, 8, 9] as const;
+
+const createInvoiceSchema = z.object({
+  cbteTipo: z.number().refine((v) => (VALID_CBTE_TIPOS as readonly number[]).includes(v), {
+    message: `cbteTipo must be one of: ${VALID_CBTE_TIPOS.join(', ')}`,
+  }),
+  clientId: z.number().int().positive().optional(),
+  docTipo: z.number().int().min(0),
+  docNro: z.string().min(1, 'docNro is required'),
+  concepto: z.number().int().min(1).max(3).default(2),
+  puntoVenta: z.number().int().positive(),
+  items: z
+    .array(
+      z.object({
+        description: z.string().min(1, 'Item description is required'),
+        quantity: z.number().positive('Quantity must be positive'),
+        unitPrice: z.number().min(0, 'Unit price must be non-negative'),
+        ivaId: z.number().refine((v) => (VALID_IVA_IDS as readonly number[]).includes(v), {
+          message: `ivaId must be one of: ${VALID_IVA_IDS.join(', ')}`,
+        }),
+      })
+    )
+    .min(1, 'At least one item is required'),
+  fchServDesde: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  fchServHasta: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  fchVtoPago: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  observations: z.string().optional(),
+});
+
+// POST / - Create invoice
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = createInvoiceSchema.parse(req.body);
+    const result = await invoiceService.createInvoice(data);
+
+    res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /stats - Dashboard stats (must be before /:id)
+router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await invoiceService.getInvoiceStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET / - List invoices
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const filters = {
+      page: req.query.page ? parseInt(req.query.page as string, 10) : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+      cbteTipo: req.query.cbteTipo ? parseInt(req.query.cbteTipo as string, 10) : undefined,
+      clientId: req.query.clientId ? parseInt(req.query.clientId as string, 10) : undefined,
+      from: req.query.from as string | undefined,
+      to: req.query.to as string | undefined,
+    };
+
+    const result = await invoiceService.getInvoices(filters);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /:id - Get invoice detail
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ success: false, error: 'Invalid invoice ID' });
+      return;
+    }
+
+    const invoice = await invoiceService.getInvoiceById(id);
+    res.json({ success: true, data: invoice });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;

@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: arca-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-arca}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-arca_dev_2024}
+      POSTGRES_DB: ${DB_NAME:-arca_facturacion}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-arca} -d ${DB_NAME:-arca_facturacion}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: arca-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-arca}:${DB_PASSWORD:-arca_dev_2024}@postgres:5432/${DB_NAME:-arca_facturacion}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      AFIP_CUIT: ${AFIP_CUIT:-20000000000}
+      AFIP_CERT_PATH: ${AFIP_CERT_PATH:-./certs/cert.crt}
+      AFIP_KEY_PATH: ${AFIP_KEY_PATH:-./certs/key.key}
+      AFIP_PUNTO_VENTA: ${AFIP_PUNTO_VENTA:-1}
+      AFIP_PRODUCTION: ${AFIP_PRODUCTION:-false}
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./certs:/app/certs:ro
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: arca-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: arca-nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:

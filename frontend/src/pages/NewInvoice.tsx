@@ -1,0 +1,559 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useForm, useFieldArray } from 'react-hook-form';
+import toast from 'react-hot-toast';
+import {
+  PlusIcon,
+  TrashIcon,
+  CheckCircleIcon,
+} from '@heroicons/react/24/outline';
+import { createInvoice, getClients } from '../api/client';
+import {
+  CBTE_TIPOS,
+  IVA_ALICUOTAS,
+  type Client,
+} from '../types';
+import { formatCurrency, todayAsInputDate, inputDateToYYYYMMDD } from '../utils/formatters';
+
+interface FormItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  ivaId: number;
+}
+
+interface InvoiceFormData {
+  cbteTipo: number;
+  puntoVenta: number;
+  concepto: number;
+  docTipo: number;
+  docNro: string;
+  clientId?: number;
+  items: FormItem[];
+  fchServDesde: string;
+  fchServHasta: string;
+  fchVtoPago: string;
+  observations: string;
+}
+
+export default function NewInvoice() {
+  const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<{ cae: string; cbteNro: number; cbteTipo: number; puntoVenta: number } | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  const today = todayAsInputDate();
+
+  const { register, control, watch, setValue, handleSubmit, formState: { errors } } = useForm<InvoiceFormData>({
+    defaultValues: {
+      cbteTipo: 11,
+      puntoVenta: 1,
+      concepto: 2,
+      docTipo: 99,
+      docNro: '0',
+      items: [{ description: 'Cena', quantity: 1, unitPrice: 0, ivaId: 5 }],
+      fchServDesde: today,
+      fchServHasta: today,
+      fchVtoPago: today,
+      observations: '',
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+
+  const watchItems = watch('items');
+  const watchCbteTipo = watch('cbteTipo');
+
+  // Load clients
+  useEffect(() => {
+    getClients({ limit: 100 })
+      .then((data) => setClients(data.clients || []))
+      .catch(() => {});
+  }, []);
+
+  // Filter clients for dropdown
+  const filteredClients = clients.filter(
+    (c) =>
+      c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+      c.docNumber.includes(clientSearch)
+  );
+
+  const selectClient = useCallback(
+    (client: Client) => {
+      setSelectedClient(client);
+      setValue('docTipo', client.docType);
+      setValue('docNro', client.docNumber);
+      setValue('clientId', client.id);
+      setClientSearch(client.name);
+      setShowClientDropdown(false);
+    },
+    [setValue]
+  );
+
+  const clearClient = () => {
+    setSelectedClient(null);
+    setValue('docTipo', 99);
+    setValue('docNro', '0');
+    setValue('clientId', undefined);
+    setClientSearch('');
+  };
+
+  // Calculate totals
+  const calculateTotals = () => {
+    let impNeto = 0;
+    let impIVA = 0;
+    let impTotConc = 0;
+
+    (watchItems || []).forEach((item) => {
+      const subtotal = (item.quantity || 0) * (item.unitPrice || 0);
+      const ivaInfo = IVA_ALICUOTAS[item.ivaId];
+      const rate = ivaInfo?.rate ?? 21;
+      const ivaAmount = subtotal * rate / 100;
+
+      if (rate > 0) {
+        impNeto += subtotal;
+        impIVA += ivaAmount;
+      } else {
+        impTotConc += subtotal;
+      }
+    });
+
+    const impTotal = impNeto + impIVA + impTotConc;
+    return { impNeto, impIVA, impTotConc, impOpEx: 0, impTotal };
+  };
+
+  const totals = calculateTotals();
+
+  const onSubmit = async (data: InvoiceFormData) => {
+    try {
+      setSubmitting(true);
+
+      const items = data.items.map((item) => {
+        const ivaInfo = IVA_ALICUOTAS[item.ivaId];
+        const subtotal = item.quantity * item.unitPrice;
+        const ivaAmount = subtotal * (ivaInfo?.rate ?? 21) / 100;
+        return {
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          ivaId: Number(item.ivaId),
+          ivaRate: ivaInfo?.rate ?? 21,
+          subtotal,
+          ivaAmount,
+        };
+      });
+
+      const payload = {
+        cbteTipo: Number(data.cbteTipo),
+        puntoVenta: Number(data.puntoVenta),
+        concepto: Number(data.concepto),
+        docTipo: Number(data.docTipo),
+        docNro: data.docNro,
+        clientId: data.clientId || undefined,
+        items,
+        impTotal: totals.impTotal,
+        impNeto: totals.impNeto,
+        impIVA: totals.impIVA,
+        impTotConc: totals.impTotConc,
+        impOpEx: 0,
+        impTrib: 0,
+        fchServDesde: inputDateToYYYYMMDD(data.fchServDesde),
+        fchServHasta: inputDateToYYYYMMDD(data.fchServHasta),
+        fchVtoPago: inputDateToYYYYMMDD(data.fchVtoPago),
+        observations: data.observations || undefined,
+      };
+
+      const result = await createInvoice(payload);
+      const inv = result.invoice;
+
+      toast.success('Factura emitida exitosamente');
+      setSuccess({
+        cae: inv.cae || '',
+        cbteNro: inv.cbteNro,
+        cbteTipo: inv.cbteTipo,
+        puntoVenta: inv.puntoVenta,
+      });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al emitir la factura';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <div className="card text-center">
+          <CheckCircleIcon className="mx-auto h-16 w-16 text-green-500" />
+          <h2 className="mt-4 text-xl font-bold text-gray-900">Factura Emitida</h2>
+          <p className="mt-2 text-gray-600">
+            {CBTE_TIPOS[success.cbteTipo]} N.{' '}
+            {String(success.puntoVenta).padStart(5, '0')}-
+            {String(success.cbteNro).padStart(8, '0')}
+          </p>
+          {success.cae && (
+            <div className="mt-4 rounded-lg bg-green-50 p-4">
+              <p className="text-sm font-medium text-green-800">CAE</p>
+              <p className="mt-1 font-mono text-lg font-bold text-green-900">
+                {success.cae}
+              </p>
+            </div>
+          )}
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              onClick={() => {
+                setSuccess(null);
+                navigate('/facturas/nueva');
+                window.location.reload();
+              }}
+              className="btn-primary"
+            >
+              Nueva Factura
+            </button>
+            <button onClick={() => navigate('/facturas')} className="btn-secondary">
+              Ver Facturas
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-4xl space-y-6">
+      {/* Invoice Type Selection */}
+      <div className="card">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">
+          Tipo de Comprobante
+        </h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {Object.entries(CBTE_TIPOS).map(([value, label]) => (
+            <label
+              key={value}
+              className={`cursor-pointer rounded-lg border-2 p-3 text-center text-sm font-medium transition-all ${
+                Number(watchCbteTipo) === Number(value)
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="radio"
+                value={value}
+                {...register('cbteTipo', { valueAsNumber: true })}
+                className="sr-only"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Punto de Venta */}
+      <div className="card">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">Punto de Venta</label>
+            <input
+              type="number"
+              {...register('puntoVenta', { valueAsNumber: true, required: true, min: 1 })}
+              className="input"
+              min={1}
+            />
+            {errors.puntoVenta && (
+              <p className="mt-1 text-xs text-red-600">Punto de venta requerido</p>
+            )}
+          </div>
+          <div>
+            <label className="label">Concepto</label>
+            <select {...register('concepto', { valueAsNumber: true })} className="select">
+              <option value={1}>Productos</option>
+              <option value={2}>Servicios</option>
+              <option value={3}>Productos y Servicios</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Client Selection */}
+      <div className="card">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">Cliente</h3>
+        <div className="space-y-4">
+          <div className="relative">
+            <label className="label">Buscar Cliente</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={clientSearch}
+                onChange={(e) => {
+                  setClientSearch(e.target.value);
+                  setShowClientDropdown(true);
+                  if (!e.target.value) clearClient();
+                }}
+                onFocus={() => setShowClientDropdown(true)}
+                placeholder="Buscar por nombre o documento..."
+                className="input flex-1"
+              />
+              {selectedClient && (
+                <button type="button" onClick={clearClient} className="btn-secondary text-xs">
+                  Limpiar
+                </button>
+              )}
+            </div>
+            {showClientDropdown && clientSearch && filteredClients.length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {filteredClients.map((client) => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onClick={() => selectClient(client)}
+                    className="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-indigo-50"
+                  >
+                    <span className="font-medium">{client.name}</span>
+                    <span className="text-xs text-gray-500">{client.docNumber}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Tipo de Documento</label>
+              <select {...register('docTipo', { valueAsNumber: true })} className="select">
+                <option value={80}>CUIT</option>
+                <option value={86}>CUIL</option>
+                <option value={96}>DNI</option>
+                <option value={99}>Consumidor Final</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Numero de Documento</label>
+              <input
+                type="text"
+                {...register('docNro', { required: true })}
+                className="input"
+                placeholder="20123456789"
+              />
+              {errors.docNro && (
+                <p className="mt-1 text-xs text-red-600">Documento requerido</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="card">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900">Items</h3>
+          <button
+            type="button"
+            onClick={() =>
+              append({ description: 'Cena', quantity: 1, unitPrice: 0, ivaId: 5 })
+            }
+            className="btn-secondary text-xs"
+          >
+            <PlusIcon className="mr-1 h-4 w-4" />
+            Agregar Item
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {fields.map((field, index) => {
+            const item = watchItems?.[index];
+            const subtotal = (item?.quantity || 0) * (item?.unitPrice || 0);
+            const ivaInfo = IVA_ALICUOTAS[item?.ivaId ?? 5];
+            const ivaAmount = subtotal * (ivaInfo?.rate ?? 21) / 100;
+
+            return (
+              <div
+                key={field.id}
+                className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+              >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-4">
+                    <label className="label">Descripcion</label>
+                    <input
+                      type="text"
+                      {...register(`items.${index}.description`, { required: true })}
+                      className="input"
+                      placeholder="Cena"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">Cantidad</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      {...register(`items.${index}.quantity`, {
+                        valueAsNumber: true,
+                        required: true,
+                        min: 0.01,
+                      })}
+                      className="input"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">Precio Unit.</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register(`items.${index}.unitPrice`, {
+                        valueAsNumber: true,
+                        required: true,
+                        min: 0,
+                      })}
+                      className="input"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">IVA</label>
+                    <select
+                      {...register(`items.${index}.ivaId`, { valueAsNumber: true })}
+                      className="select"
+                    >
+                      {Object.entries(IVA_ALICUOTAS).map(([id, info]) => (
+                        <option key={id} value={id}>
+                          {info.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end sm:col-span-2">
+                    <div className="flex-1">
+                      <label className="label">Subtotal</label>
+                      <p className="rounded-lg bg-white px-3 py-2.5 text-sm font-semibold">
+                        {formatCurrency(subtotal)}
+                      </p>
+                    </div>
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="mb-1 ml-2 rounded-lg p-2 text-red-500 hover:bg-red-50"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-2 text-right text-xs text-gray-500">
+                  IVA: {formatCurrency(ivaAmount)} | Total: {formatCurrency(subtotal + ivaAmount)}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Service Dates */}
+      <div className="card">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">
+          Fechas de Servicio
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label">Fecha Desde</label>
+            <input
+              type="date"
+              {...register('fchServDesde', { required: true })}
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label">Fecha Hasta</label>
+            <input
+              type="date"
+              {...register('fchServHasta', { required: true })}
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label">Vencimiento de Pago</label>
+            <input
+              type="date"
+              {...register('fchVtoPago', { required: true })}
+              className="input"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Observations */}
+      <div className="card">
+        <label className="label">Observaciones</label>
+        <textarea
+          {...register('observations')}
+          className="input"
+          rows={3}
+          placeholder="Observaciones opcionales..."
+        />
+      </div>
+
+      {/* Totals Summary */}
+      <div className="card">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">Resumen</h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">Neto Gravado</span>
+            <span className="font-medium">{formatCurrency(totals.impNeto)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">IVA</span>
+            <span className="font-medium">{formatCurrency(totals.impIVA)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">No Gravado</span>
+            <span className="font-medium">{formatCurrency(totals.impTotConc)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">Exento</span>
+            <span className="font-medium">{formatCurrency(totals.impOpEx)}</span>
+          </div>
+          <div className="border-t border-gray-200 pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-bold text-gray-900">TOTAL</span>
+              <span className="text-lg font-bold text-indigo-600">
+                {formatCurrency(totals.impTotal)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Submit */}
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/facturas')}
+          className="btn-secondary"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="btn-primary"
+        >
+          {submitting ? (
+            <>
+              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Emitiendo...
+            </>
+          ) : (
+            'Emitir Factura'
+          )}
+        </button>
+      </div>
+    </form>
+  );
+}

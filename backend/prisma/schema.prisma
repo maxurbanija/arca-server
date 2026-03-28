@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("user")
+  apiKeys   ApiKey[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ApiKey {
+  id        Int      @id @default(autoincrement())
+  name      String
+  key       String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsed  DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([key])
+  @@index([userId])
+}
+
+model Client {
+  id           Int       @id @default(autoincrement())
+  name         String
+  docType      Int
+  docNumber    String
+  ivaCondition Int
+  address      String?
+  email        String?
+  phone        String?
+  invoices     Invoice[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([docNumber])
+  @@index([name])
+}
+
+model Invoice {
+  id           Int           @id @default(autoincrement())
+  cbteTipo     Int
+  puntoVenta   Int
+  cbteNro      Int
+  cbteDesde    Int
+  cbteHasta    Int
+  cbteFch      String
+  concepto     Int           @default(2)
+  docTipo      Int
+  docNro       String
+  impTotal     Decimal       @db.Decimal(15, 2)
+  impTotConc   Decimal       @db.Decimal(15, 2)
+  impNeto      Decimal       @db.Decimal(15, 2)
+  impOpEx      Decimal       @db.Decimal(15, 2)
+  impIVA       Decimal       @db.Decimal(15, 2)
+  impTrib      Decimal       @db.Decimal(15, 2)
+  cae          String?
+  caeFchVto    String?
+  resultado    String?
+  monId        String        @default("PES")
+  monCotiz     Decimal       @default(1) @db.Decimal(15, 6)
+  fchServDesde String?
+  fchServHasta String?
+  fchVtoPago   String?
+  clientId     Int?
+  client       Client?       @relation(fields: [clientId], references: [id])
+  items        InvoiceItem[]
+  observations String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([cbteTipo, puntoVenta, cbteNro])
+  @@index([cbteFch])
+  @@index([clientId])
+}
+
+model InvoiceItem {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal @db.Decimal(15, 4)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  ivaId       Int
+  ivaRate     Decimal @db.Decimal(5, 2)
+  subtotal    Decimal @db.Decimal(15, 2)
+  ivaAmount   Decimal @db.Decimal(15, 2)
+
+  @@index([invoiceId])
+}
