@@ -189,19 +189,23 @@ export default function NewInvoice() {
 
   if (success) {
     return (
-      <div className="mx-auto max-w-lg">
+      <div className="mx-auto max-w-md">
         <div className="card text-center">
-          <CheckCircleIcon className="mx-auto h-16 w-16 text-green-500" />
-          <h2 className="mt-4 text-xl font-bold text-gray-900">Factura Emitida</h2>
-          <p className="mt-2 text-gray-600">
-            {CBTE_TIPOS[success.cbteTipo]} N.{' '}
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+            <CheckCircleIcon className="h-10 w-10 text-emerald-500" />
+          </div>
+          <h2 className="mt-5 text-xl font-bold text-gray-900">Factura Emitida</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {CBTE_TIPOS[success.cbteTipo]}
+          </p>
+          <p className="mt-1 font-mono text-lg font-bold text-indigo-600">
             {String(success.puntoVenta).padStart(5, '0')}-
             {String(success.cbteNro).padStart(8, '0')}
           </p>
           {success.cae && (
-            <div className="mt-4 rounded-lg bg-green-50 p-4">
-              <p className="text-sm font-medium text-green-800">CAE</p>
-              <p className="mt-1 font-mono text-lg font-bold text-green-900">
+            <div className="mt-5 rounded-xl bg-emerald-50 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">CAE</p>
+              <p className="mt-1 font-mono text-lg font-bold tracking-wide text-emerald-900">
                 {success.cae}
               </p>
             </div>
@@ -213,11 +217,12 @@ export default function NewInvoice() {
                 navigate('/facturas/nueva');
                 window.location.reload();
               }}
-              className="btn-primary"
+              className="btn-primary text-sm"
             >
+              <PlusIcon className="h-4 w-4" />
               Nueva Factura
             </button>
-            <button onClick={() => navigate('/facturas')} className="btn-secondary">
+            <button onClick={() => navigate('/facturas')} className="btn-secondary text-sm">
               Ver Facturas
             </button>
           </div>

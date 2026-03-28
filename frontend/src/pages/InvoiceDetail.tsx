@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
   PrinterIcon,
+  QrCodeIcon,
 } from '@heroicons/react/24/outline';
 import { getInvoice } from '../api/client';
 import type { Invoice } from '../types';
@@ -229,24 +230,37 @@ export default function InvoiceDetail() {
 
       {/* CAE Info */}
       {invoice.cae && (
-        <div className="card bg-green-50">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-green-800">
-            Autorizacion Electronica (CAE)
+        <div className="card border-emerald-200 bg-emerald-50/50">
+          <h3 className="section-title mb-3 text-emerald-700">
+            Autorización Electrónica (CAE)
           </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-sm text-green-700">Numero de CAE</p>
-              <p className="font-mono text-xl font-bold text-green-900">
+              <p className="text-xs text-emerald-600">Número de CAE</p>
+              <p className="mt-0.5 font-mono text-xl font-bold text-emerald-900">
                 {invoice.cae}
               </p>
             </div>
             <div>
-              <p className="text-sm text-green-700">Vencimiento CAE</p>
-              <p className="text-lg font-semibold text-green-900">
+              <p className="text-xs text-emerald-600">Vencimiento CAE</p>
+              <p className="mt-0.5 text-lg font-semibold text-emerald-900">
                 {formatDate(invoice.caeFchVto || '')}
               </p>
             </div>
           </div>
+          {invoice.qrUrl && (
+            <div className="mt-4 border-t border-emerald-200 pt-4">
+              <a
+                href={invoice.qrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition-colors hover:bg-emerald-200"
+              >
+                <QrCodeIcon className="h-4 w-4" />
+                Ver QR en AFIP
+              </a>
+            </div>
+          )}
         </div>
       )}
 

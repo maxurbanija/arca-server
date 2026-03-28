@@ -6,15 +6,17 @@ import {
   CalendarDaysIcon,
   PlusCircleIcon,
   UserPlusIcon,
-  CheckCircleIcon,
   XCircleIcon,
+  ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline';
 import { getInvoiceStats, getInvoices, getAfipStatus } from '../api/client';
 import type { Invoice, InvoiceStats } from '../types';
 import { formatCurrency, formatDate, formatCbteTipo, formatFullInvoiceNumber } from '../utils/formatters';
 import InvoiceStatusBadge from '../components/InvoiceStatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [afipStatus, setAfipStatus] = useState<Record<string, string> | null>(null);
@@ -33,7 +35,6 @@ export default function Dashboard() {
         if (statsData) setStats(statsData);
         setRecentInvoices(invoicesData.invoices || []);
 
-        // Load AFIP status separately (might fail)
         try {
           const status = await getAfipStatus();
           setAfipStatus(status);
@@ -53,15 +54,18 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-indigo-600 border-t-transparent" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 p-6 text-center">
-        <p className="text-red-700">{error}</p>
+      <div className="empty-state">
+        <div className="rounded-full bg-red-50 p-4">
+          <XCircleIcon className="h-8 w-8 text-red-400" />
+        </div>
+        <p className="mt-4 text-sm font-medium text-gray-900">{error}</p>
         <button onClick={() => window.location.reload()} className="btn-primary mt-4">
           Reintentar
         </button>
@@ -69,70 +73,88 @@ export default function Dashboard() {
     );
   }
 
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Buenos días';
+    if (hour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  };
+
   return (
     <div className="space-y-6">
-      {/* AFIP Status */}
-      {afipStatus && (
-        <div className="card flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-600">Estado AFIP:</span>
-          {['AppServer', 'DbServer', 'AuthServer'].map((server) => (
-            <span key={server} className="inline-flex items-center gap-1 text-xs">
-              {afipStatus[server] === 'OK' ? (
-                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-              ) : (
-                <XCircleIcon className="h-4 w-4 text-red-500" />
-              )}
-              {server}: {afipStatus[server] || 'N/A'}
-            </span>
-          ))}
+      {/* Welcome + AFIP Status */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">
+            {greeting()}, {user?.name?.split(' ')[0]}
+          </h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Resumen de tu actividad de facturación
+          </p>
         </div>
-      )}
+
+        {afipStatus && (
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200/80 bg-white px-4 py-2 shadow-sm">
+            <span className="text-xs font-medium text-gray-500">AFIP</span>
+            {['AppServer', 'DbServer', 'AuthServer'].map((server) => (
+              <span key={server} className="inline-flex items-center gap-1 text-[11px] text-gray-600">
+                {afipStatus[server] === 'OK' ? (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                )}
+                {server.replace('Server', '')}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="stat-card">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
-            <DocumentTextIcon className="h-6 w-6 text-indigo-600" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50">
+            <DocumentTextIcon className="h-5 w-5 text-indigo-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500">Total Facturas</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-xs font-medium text-gray-500">Total Facturas</p>
+            <p className="mt-0.5 text-2xl font-bold tracking-tight text-gray-900">
               {stats?.totalInvoices ?? 0}
             </p>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-            <CurrencyDollarIcon className="h-6 w-6 text-green-600" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50">
+            <CurrencyDollarIcon className="h-5 w-5 text-emerald-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500">Monto Total</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-xs font-medium text-gray-500">Monto Total</p>
+            <p className="mt-0.5 text-2xl font-bold tracking-tight text-gray-900">
               {formatCurrency(stats?.totalAmount ?? 0)}
             </p>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-            <CalendarDaysIcon className="h-6 w-6 text-blue-600" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50">
+            <CalendarDaysIcon className="h-5 w-5 text-blue-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500">Facturas del Mes</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-xs font-medium text-gray-500">Este Mes</p>
+            <p className="mt-0.5 text-2xl font-bold tracking-tight text-gray-900">
               {stats?.monthlyInvoices ?? 0}
             </p>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100">
-            <CurrencyDollarIcon className="h-6 w-6 text-purple-600" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50">
+            <ArrowTrendingUpIcon className="h-5 w-5 text-violet-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500">Monto del Mes</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-xs font-medium text-gray-500">Monto del Mes</p>
+            <p className="mt-0.5 text-2xl font-bold tracking-tight text-gray-900">
               {formatCurrency(stats?.monthlyAmount ?? 0)}
             </p>
           </div>
@@ -142,95 +164,107 @@ export default function Dashboard() {
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
         <Link to="/facturas/nueva" className="btn-primary">
-          <PlusCircleIcon className="mr-2 h-5 w-5" />
+          <PlusCircleIcon className="h-4 w-4" />
           Nueva Factura
         </Link>
         <Link to="/clientes/nuevo" className="btn-secondary">
-          <UserPlusIcon className="mr-2 h-5 w-5" />
+          <UserPlusIcon className="h-4 w-4" />
           Nuevo Cliente
         </Link>
       </div>
 
-      {/* Recent Invoices */}
-      <div className="card">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Facturas Recientes</h2>
-          <Link to="/facturas" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-            Ver todas
-          </Link>
-        </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Recent Invoices */}
+        <div className="card lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900">Facturas Recientes</h3>
+            <Link to="/facturas" className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+              Ver todas
+            </Link>
+          </div>
 
-        {recentInvoices.length === 0 ? (
-          <p className="py-8 text-center text-gray-500">
-            No hay facturas registradas. Crea tu primera factura.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="table-header px-4 py-3">Tipo</th>
-                  <th className="table-header px-4 py-3">Numero</th>
-                  <th className="table-header px-4 py-3">Fecha</th>
-                  <th className="table-header px-4 py-3">Cliente</th>
-                  <th className="table-header px-4 py-3">Total</th>
-                  <th className="table-header px-4 py-3">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {recentInvoices.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className="cursor-pointer transition-colors hover:bg-gray-50"
-                  >
-                    <td className="table-cell">
-                      <Link to={`/facturas/${inv.id}`} className="text-indigo-600 hover:underline">
-                        {formatCbteTipo(inv.cbteTipo)}
-                      </Link>
-                    </td>
-                    <td className="table-cell font-mono text-xs">
-                      {formatFullInvoiceNumber(inv.puntoVenta, inv.cbteNro)}
-                    </td>
-                    <td className="table-cell">{formatDate(inv.cbteFch)}</td>
-                    <td className="table-cell">{inv.client?.name || inv.docNro}</td>
-                    <td className="table-cell font-semibold">
-                      {formatCurrency(inv.impTotal)}
-                    </td>
-                    <td className="table-cell">
-                      <InvoiceStatusBadge resultado={inv.resultado} />
-                    </td>
+          {recentInvoices.length === 0 ? (
+            <div className="empty-state py-10">
+              <DocumentTextIcon className="h-10 w-10 text-gray-300" />
+              <p className="mt-3 text-sm text-gray-500">
+                No hay facturas registradas
+              </p>
+              <Link to="/facturas/nueva" className="btn-primary mt-4 text-xs">
+                Crear primera factura
+              </Link>
+            </div>
+          ) : (
+            <div className="-mx-6 overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Tipo</th>
+                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Número</th>
+                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Fecha</th>
+                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Cliente</th>
+                    <th className="px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total</th>
+                    <th className="px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Estado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Stats by type */}
-      {stats?.byType && stats.byType.length > 0 && (
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Resumen por Tipo</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {stats.byType.map((item) => (
-              <div
-                key={item.cbteTipo}
-                className="flex items-center justify-between rounded-lg border border-gray-100 p-4"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {formatCbteTipo(item.cbteTipo)}
-                  </p>
-                  <p className="text-xs text-gray-500">{item.count} comprobantes</p>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">
-                  {formatCurrency(item.total)}
-                </p>
-              </div>
-            ))}
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {recentInvoices.map((inv) => (
+                    <tr
+                      key={inv.id}
+                      className="cursor-pointer transition-colors hover:bg-gray-50/50"
+                    >
+                      <td className="px-6 py-2.5 text-sm">
+                        <Link to={`/facturas/${inv.id}`} className="font-medium text-indigo-600 hover:text-indigo-700">
+                          {formatCbteTipo(inv.cbteTipo)}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-2.5 font-mono text-xs text-gray-500">
+                        {formatFullInvoiceNumber(inv.puntoVenta, inv.cbteNro)}
+                      </td>
+                      <td className="px-6 py-2.5 text-sm text-gray-500">{formatDate(inv.cbteFch)}</td>
+                      <td className="px-6 py-2.5 text-sm text-gray-600">{inv.client?.name || inv.docNro}</td>
+                      <td className="px-6 py-2.5 text-right text-sm font-semibold text-gray-900">
+                        {formatCurrency(inv.impTotal)}
+                      </td>
+                      <td className="px-6 py-2.5 text-right">
+                        <InvoiceStatusBadge resultado={inv.resultado} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Stats by type */}
+        <div className="card">
+          <h3 className="mb-4 text-sm font-semibold text-gray-900">Por Tipo</h3>
+          {stats?.byType && stats.byType.length > 0 ? (
+            <div className="space-y-3">
+              {stats.byType.map((item) => (
+                <div
+                  key={item.cbteTipo}
+                  className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2.5 transition-colors hover:bg-gray-50"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {formatCbteTipo(item.cbteTipo)}
+                    </p>
+                    <p className="text-[11px] text-gray-400">{item.count} comprobantes</p>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {formatCurrency(item.total)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state py-8">
+              <p className="text-xs text-gray-400">Sin datos aún</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

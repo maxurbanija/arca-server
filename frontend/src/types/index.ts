@@ -48,6 +48,7 @@ export interface Invoice {
   clientId?: number;
   client?: Client;
   items: InvoiceItem[];
+  qrUrl?: string;
   observations?: string;
   createdAt: string;
 }

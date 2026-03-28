@@ -5,6 +5,7 @@ import {
   PlusCircleIcon,
   PencilSquareIcon,
   TrashIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { getClients, deleteClient } from '../api/client';
@@ -97,10 +98,11 @@ export default function ClientList() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           </div>
         ) : clients.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-gray-500">No se encontraron clientes</p>
-            <Link to="/clientes/nuevo" className="btn-primary mt-4 inline-flex">
-              Crear Primer Cliente
+          <div className="empty-state">
+            <UsersIcon className="h-10 w-10 text-gray-300" />
+            <p className="mt-3 text-sm font-medium text-gray-500">No se encontraron clientes</p>
+            <Link to="/clientes/nuevo" className="btn-primary mt-4 text-xs">
+              Crear primer cliente
             </Link>
           </div>
         ) : (

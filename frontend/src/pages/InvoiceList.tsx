@@ -4,6 +4,7 @@ import {
   FunnelIcon,
   PlusCircleIcon,
   ArrowDownTrayIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import { getInvoices } from '../api/client';
 import type { Invoice } from '../types';
@@ -147,10 +148,11 @@ export default function InvoiceList() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           </div>
         ) : invoices.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-gray-500">No se encontraron facturas</p>
-            <Link to="/facturas/nueva" className="btn-primary mt-4 inline-flex">
-              Crear Primera Factura
+          <div className="empty-state">
+            <DocumentTextIcon className="h-10 w-10 text-gray-300" />
+            <p className="mt-3 text-sm font-medium text-gray-500">No se encontraron facturas</p>
+            <Link to="/facturas/nueva" className="btn-primary mt-4 text-xs">
+              Crear primera factura
             </Link>
           </div>
         ) : (
