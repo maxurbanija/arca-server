@@ -55,6 +55,22 @@ export async function createInvoice(invoiceData: Record<string, unknown>) {
   return data;
 }
 
+export async function createNotaCredito(data: Record<string, unknown>) {
+  const { data: result } = await api.post<{
+    invoice: Invoice;
+    afipResponse: Record<string, unknown>;
+  }>('/invoices/nota-credito', data);
+  return result;
+}
+
+export async function createNotaDebito(data: Record<string, unknown>) {
+  const { data: result } = await api.post<{
+    invoice: Invoice;
+    afipResponse: Record<string, unknown>;
+  }>('/invoices/nota-debito', data);
+  return result;
+}
+
 export async function getInvoice(id: number) {
   const { data } = await api.get<Invoice>(`/invoices/${id}`);
   return data;
@@ -102,18 +118,80 @@ export async function deleteClient(id: number) {
 
 // AFIP
 export async function getAfipStatus() {
-  const { data } = await api.get<{
-    AppServer: string;
-    DbServer: string;
-    AuthServer: string;
-  }>('/afip/status');
+  const { data } = await api.get('/afip/status');
   return data;
 }
 
 export async function getLastVoucher(puntoVenta: number, cbteTipo: number) {
-  const { data } = await api.get<{ cbteNro: number }>(
-    `/afip/last-voucher/${puntoVenta}/${cbteTipo}`
+  const { data } = await api.get('/afip/last-voucher', {
+    params: { puntoVenta, cbteTipo },
+  });
+  return data;
+}
+
+export async function getPuntosVenta() {
+  const { data } = await api.get<{ Nro: number; EmisionTipo: string; Bloqueado: string; FchBaja: string }[]>(
+    '/afip/puntos-venta'
   );
+  return data;
+}
+
+export async function consultarCuit(cuit: number) {
+  const { data } = await api.get<{
+    cuit: number;
+    nombre: string;
+    tipoPersona: string;
+    estadoClave: string;
+    domicilioFiscal?: { direccion?: string; localidad?: string; codPostal?: string };
+    impuestos?: { id: number; descripcion: string; estado: string }[];
+  }>(`/afip/contribuyente/${cuit}`);
+  return data;
+}
+
+export async function consultarComprobante(puntoVenta: number, cbteTipo: number, cbteNro: number) {
+  const { data } = await api.get('/afip/comprobante', {
+    params: { puntoVenta, cbteTipo, cbteNro },
+  });
+  return data;
+}
+
+export async function getCotizacion(monedaId: string) {
+  const { data } = await api.get('/afip/cotizacion', { params: { monedaId } });
+  return data;
+}
+
+export async function getAfipInvoiceTypes() {
+  const { data } = await api.get('/afip/invoice-types');
+  return data;
+}
+
+export async function getAfipDocTypes() {
+  const { data } = await api.get('/afip/doc-types');
+  return data;
+}
+
+export async function getAfipIvaTypes() {
+  const { data } = await api.get('/afip/iva-types');
+  return data;
+}
+
+export async function getAfipConceptTypes() {
+  const { data } = await api.get('/afip/concept-types');
+  return data;
+}
+
+export async function getAfipCurrencyTypes() {
+  const { data } = await api.get('/afip/currency-types');
+  return data;
+}
+
+export async function getAfipTributoTypes() {
+  const { data } = await api.get('/afip/tributo-types');
+  return data;
+}
+
+export async function getAfipOptionalTypes() {
+  const { data } = await api.get('/afip/optional-types');
   return data;
 }
 

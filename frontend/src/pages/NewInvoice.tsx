@@ -6,8 +6,9 @@ import {
   PlusIcon,
   TrashIcon,
   CheckCircleIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { createInvoice, getClients } from '../api/client';
+import { createInvoice, getClients, getPuntosVenta } from '../api/client';
 import {
   CBTE_TIPOS,
   IVA_ALICUOTAS,
@@ -36,10 +37,27 @@ interface InvoiceFormData {
   observations: string;
 }
 
+// Solo facturas en NewInvoice — NC/ND se crean desde otro flujo
+const FACTURA_TIPOS: Record<number, string> = {
+  1: 'Factura A',
+  6: 'Factura B',
+  11: 'Factura C',
+};
+
+// Tipo A requiere CUIT del receptor
+const TIPOS_A = new Set([1]);
+// Tipo C no discrimina IVA
+const TIPOS_C = new Set([11]);
+
+function isTipoA(tipo: number) { return TIPOS_A.has(tipo); }
+function isTipoC(tipo: number) { return TIPOS_C.has(tipo); }
+function needsServiceDates(concepto: number) { return concepto === 2 || concepto === 3; }
+
 export default function NewInvoice() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<{ cae: string; cbteNro: number; cbteTipo: number; puntoVenta: number } | null>(null);
+  const [puntosVenta, setPuntosVenta] = useState<{ Nro: number; EmisionTipo: string }[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -51,10 +69,10 @@ export default function NewInvoice() {
     defaultValues: {
       cbteTipo: 11,
       puntoVenta: 1,
-      concepto: 2,
+      concepto: 1,
       docTipo: 99,
       docNro: '0',
-      items: [{ description: 'Cena', quantity: 1, unitPrice: 0, ivaId: 5 }],
+      items: [{ description: '', quantity: 1, unitPrice: 0, ivaId: 5 }],
       fchServDesde: today,
       fchServHasta: today,
       fchVtoPago: today,
@@ -65,16 +83,42 @@ export default function NewInvoice() {
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
   const watchItems = watch('items');
-  const watchCbteTipo = watch('cbteTipo');
+  const watchCbteTipo = Number(watch('cbteTipo'));
+  const watchConcepto = Number(watch('concepto'));
 
-  // Load clients
+  const esA = isTipoA(watchCbteTipo);
+  const esC = isTipoC(watchCbteTipo);
+  const esServicio = needsServiceDates(watchConcepto);
+
+  // Cuando cambia el tipo, ajustar defaults
+  useEffect(() => {
+    if (esA) {
+      // Tipo A requiere CUIT
+      setValue('docTipo', 80);
+      if (watch('docNro') === '0') setValue('docNro', '');
+    } else if (esC) {
+      // Tipo C: consumidor final por defecto
+      if (!selectedClient) {
+        setValue('docTipo', 99);
+        setValue('docNro', '0');
+      }
+    }
+  }, [watchCbteTipo, esA, esC, setValue, selectedClient, watch]);
+
+  // Load clients and puntos de venta
   useEffect(() => {
     getClients({ limit: 100 })
       .then((data) => setClients(data.clients || []))
       .catch(() => {});
-  }, []);
+    getPuntosVenta()
+      .then((data) => {
+        const activos = (Array.isArray(data) ? data : []).filter((p) => p.Bloqueado === 'N');
+        setPuntosVenta(activos);
+        if (activos.length > 0) setValue('puntoVenta', activos[0].Nro);
+      })
+      .catch(() => {});
+  }, [setValue]);
 
-  // Filter clients for dropdown
   const filteredClients = clients.filter(
     (c) =>
       c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
@@ -95,13 +139,13 @@ export default function NewInvoice() {
 
   const clearClient = () => {
     setSelectedClient(null);
-    setValue('docTipo', 99);
-    setValue('docNro', '0');
+    setValue('docTipo', esA ? 80 : 99);
+    setValue('docNro', esA ? '' : '0');
     setValue('clientId', undefined);
     setClientSearch('');
   };
 
-  // Calculate totals
+  // Calculate totals — tipo C no discrimina IVA
   const calculateTotals = () => {
     let impNeto = 0;
     let impIVA = 0;
@@ -109,15 +153,21 @@ export default function NewInvoice() {
 
     (watchItems || []).forEach((item) => {
       const subtotal = (item.quantity || 0) * (item.unitPrice || 0);
-      const ivaInfo = IVA_ALICUOTAS[item.ivaId];
-      const rate = ivaInfo?.rate ?? 21;
-      const ivaAmount = subtotal * rate / 100;
 
-      if (rate > 0) {
+      if (esC) {
+        // Tipo C: todo va a neto, sin IVA
         impNeto += subtotal;
-        impIVA += ivaAmount;
       } else {
-        impTotConc += subtotal;
+        const ivaInfo = IVA_ALICUOTAS[item.ivaId];
+        const rate = ivaInfo?.rate ?? 21;
+        const ivaAmount = subtotal * rate / 100;
+
+        if (rate > 0) {
+          impNeto += subtotal;
+          impIVA += ivaAmount;
+        } else {
+          impTotConc += subtotal;
+        }
       }
     });
 
@@ -128,13 +178,19 @@ export default function NewInvoice() {
   const totals = calculateTotals();
 
   const onSubmit = async (data: InvoiceFormData) => {
+    // Validación extra: Tipo A requiere CUIT
+    if (esA && (!data.docNro || data.docNro === '0')) {
+      toast.error('Factura A requiere CUIT del receptor');
+      return;
+    }
+
     try {
       setSubmitting(true);
 
       const items = data.items.map((item) => {
         const ivaInfo = IVA_ALICUOTAS[item.ivaId];
         const subtotal = item.quantity * item.unitPrice;
-        const ivaAmount = subtotal * (ivaInfo?.rate ?? 21) / 100;
+        const ivaAmount = esC ? 0 : subtotal * (ivaInfo?.rate ?? 21) / 100;
         return {
           description: item.description,
           quantity: item.quantity,
@@ -146,7 +202,7 @@ export default function NewInvoice() {
         };
       });
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         cbteTipo: Number(data.cbteTipo),
         puntoVenta: Number(data.puntoVenta),
         concepto: Number(data.concepto),
@@ -154,17 +210,15 @@ export default function NewInvoice() {
         docNro: data.docNro,
         clientId: data.clientId || undefined,
         items,
-        impTotal: totals.impTotal,
-        impNeto: totals.impNeto,
-        impIVA: totals.impIVA,
-        impTotConc: totals.impTotConc,
-        impOpEx: 0,
-        impTrib: 0,
-        fchServDesde: inputDateToYYYYMMDD(data.fchServDesde),
-        fchServHasta: inputDateToYYYYMMDD(data.fchServHasta),
-        fchVtoPago: inputDateToYYYYMMDD(data.fchVtoPago),
         observations: data.observations || undefined,
       };
+
+      // Solo incluir fechas de servicio si el concepto lo requiere
+      if (esServicio) {
+        payload.fchServDesde = inputDateToYYYYMMDD(data.fchServDesde);
+        payload.fchServHasta = inputDateToYYYYMMDD(data.fchServHasta);
+        payload.fchVtoPago = inputDateToYYYYMMDD(data.fchVtoPago);
+      }
 
       const result = await createInvoice(payload);
       const inv = result.invoice;
@@ -196,7 +250,7 @@ export default function NewInvoice() {
           </div>
           <h2 className="mt-5 text-xl font-bold text-gray-900">Factura Emitida</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {CBTE_TIPOS[success.cbteTipo]}
+            {CBTE_TIPOS[success.cbteTipo] || FACTURA_TIPOS[success.cbteTipo]}
           </p>
           <p className="mt-1 font-mono text-lg font-bold text-indigo-600">
             {String(success.puntoVenta).padStart(5, '0')}-
@@ -238,39 +292,81 @@ export default function NewInvoice() {
         <h3 className="mb-4 text-base font-semibold text-gray-900">
           Tipo de Comprobante
         </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {Object.entries(CBTE_TIPOS).map(([value, label]) => (
-            <label
-              key={value}
-              className={`cursor-pointer rounded-lg border-2 p-3 text-center text-sm font-medium transition-all ${
-                Number(watchCbteTipo) === Number(value)
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              <input
-                type="radio"
-                value={value}
-                {...register('cbteTipo', { valueAsNumber: true })}
-                className="sr-only"
-              />
-              {label}
-            </label>
-          ))}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {Object.entries(FACTURA_TIPOS).map(([value, label]) => {
+            const selected = watchCbteTipo === Number(value);
+            const hint = Number(value) === 1
+              ? 'RI a RI — Requiere CUIT'
+              : Number(value) === 6
+                ? 'RI a CF / Mono / Exento'
+                : 'Monotributista a cualquiera';
+            return (
+              <label
+                key={value}
+                className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                  selected
+                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  value={value}
+                  {...register('cbteTipo', { valueAsNumber: true })}
+                  className="sr-only"
+                />
+                <p className={`text-sm font-semibold ${selected ? 'text-indigo-700' : 'text-gray-700'}`}>
+                  {label}
+                </p>
+                <p className={`mt-0.5 text-xs ${selected ? 'text-indigo-500' : 'text-gray-400'}`}>
+                  {hint}
+                </p>
+              </label>
+            );
+          })}
         </div>
+
+        {/* Tipo A info */}
+        {esA && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <InformationCircleIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            Factura A requiere CUIT del receptor (Responsable Inscripto a Responsable Inscripto)
+          </div>
+        )}
+
+        {/* Tipo C info */}
+        {esC && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <InformationCircleIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            Factura C no discrimina IVA. Los importes se envían como neto sin desglose.
+          </div>
+        )}
       </div>
 
-      {/* Punto de Venta */}
+      {/* Punto de Venta + Concepto */}
       <div className="card">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="label">Punto de Venta</label>
-            <input
-              type="number"
-              {...register('puntoVenta', { valueAsNumber: true, required: true, min: 1 })}
-              className="input"
-              min={1}
-            />
+            {puntosVenta.length > 0 ? (
+              <select
+                {...register('puntoVenta', { valueAsNumber: true, required: true })}
+                className="select"
+              >
+                {puntosVenta.map((pv) => (
+                  <option key={pv.Nro} value={pv.Nro}>
+                    {String(pv.Nro).padStart(5, '0')} — {pv.EmisionTipo}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="number"
+                {...register('puntoVenta', { valueAsNumber: true, required: true, min: 1 })}
+                className="input"
+                min={1}
+              />
+            )}
             {errors.puntoVenta && (
               <p className="mt-1 text-xs text-red-600">Punto de venta requerido</p>
             )}
@@ -286,9 +382,11 @@ export default function NewInvoice() {
         </div>
       </div>
 
-      {/* Client Selection */}
+      {/* Client / Document */}
       <div className="card">
-        <h3 className="mb-4 text-base font-semibold text-gray-900">Cliente</h3>
+        <h3 className="mb-4 text-base font-semibold text-gray-900">
+          {esA ? 'Receptor (obligatorio)' : 'Cliente'}
+        </h3>
         <div className="space-y-4">
           <div className="relative">
             <label className="label">Buscar Cliente</label>
@@ -331,20 +429,36 @@ export default function NewInvoice() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label">Tipo de Documento</label>
-              <select {...register('docTipo', { valueAsNumber: true })} className="select">
-                <option value={80}>CUIT</option>
-                <option value={86}>CUIL</option>
-                <option value={96}>DNI</option>
-                <option value={99}>Consumidor Final</option>
+              <select
+                {...register('docTipo', { valueAsNumber: true })}
+                className="select"
+                disabled={esA && !selectedClient}
+              >
+                {esA ? (
+                  <option value={80}>CUIT</option>
+                ) : (
+                  <>
+                    <option value={80}>CUIT</option>
+                    <option value={86}>CUIL</option>
+                    <option value={96}>DNI</option>
+                    <option value={99}>Consumidor Final</option>
+                  </>
+                )}
               </select>
+              {esA && (
+                <p className="mt-1 text-[11px] text-gray-400">Factura A solo acepta CUIT</p>
+              )}
             </div>
             <div>
-              <label className="label">Numero de Documento</label>
+              <label className="label">
+                Número de Documento
+                {esA && <span className="text-red-500"> *</span>}
+              </label>
               <input
                 type="text"
                 {...register('docNro', { required: true })}
                 className="input"
-                placeholder="20123456789"
+                placeholder={esA ? 'Ej: 20123456789' : '20123456789'}
               />
               {errors.docNro && (
                 <p className="mt-1 text-xs text-red-600">Documento requerido</p>
@@ -361,11 +475,11 @@ export default function NewInvoice() {
           <button
             type="button"
             onClick={() =>
-              append({ description: 'Cena', quantity: 1, unitPrice: 0, ivaId: 5 })
+              append({ description: '', quantity: 1, unitPrice: 0, ivaId: 5 })
             }
             className="btn-secondary text-xs"
           >
-            <PlusIcon className="mr-1 h-4 w-4" />
+            <PlusIcon className="h-4 w-4" />
             Agregar Item
           </button>
         </div>
@@ -375,21 +489,21 @@ export default function NewInvoice() {
             const item = watchItems?.[index];
             const subtotal = (item?.quantity || 0) * (item?.unitPrice || 0);
             const ivaInfo = IVA_ALICUOTAS[item?.ivaId ?? 5];
-            const ivaAmount = subtotal * (ivaInfo?.rate ?? 21) / 100;
+            const ivaAmount = esC ? 0 : subtotal * (ivaInfo?.rate ?? 21) / 100;
 
             return (
               <div
                 key={field.id}
-                className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                className="rounded-lg border border-gray-200 bg-gray-50/50 p-4"
               >
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-                  <div className="sm:col-span-4">
-                    <label className="label">Descripcion</label>
+                  <div className={esC ? 'sm:col-span-6' : 'sm:col-span-4'}>
+                    <label className="label">Descripción</label>
                     <input
                       type="text"
                       {...register(`items.${index}.description`, { required: true })}
                       className="input"
-                      placeholder="Cena"
+                      placeholder="Descripción del producto o servicio"
                     />
                   </div>
                   <div className="sm:col-span-2">
@@ -420,23 +534,26 @@ export default function NewInvoice() {
                       className="input"
                     />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="label">IVA</label>
-                    <select
-                      {...register(`items.${index}.ivaId`, { valueAsNumber: true })}
-                      className="select"
-                    >
-                      {Object.entries(IVA_ALICUOTAS).map(([id, info]) => (
-                        <option key={id} value={id}>
-                          {info.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* IVA selector: hidden for tipo C */}
+                  {!esC && (
+                    <div className="sm:col-span-2">
+                      <label className="label">IVA</label>
+                      <select
+                        {...register(`items.${index}.ivaId`, { valueAsNumber: true })}
+                        className="select"
+                      >
+                        {Object.entries(IVA_ALICUOTAS).map(([id, info]) => (
+                          <option key={id} value={id}>
+                            {info.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="flex items-end sm:col-span-2">
                     <div className="flex-1">
                       <label className="label">Subtotal</label>
-                      <p className="rounded-lg bg-white px-3 py-2.5 text-sm font-semibold">
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm font-semibold">
                         {formatCurrency(subtotal)}
                       </p>
                     </div>
@@ -444,54 +561,58 @@ export default function NewInvoice() {
                       <button
                         type="button"
                         onClick={() => remove(index)}
-                        className="mb-1 ml-2 rounded-lg p-2 text-red-500 hover:bg-red-50"
+                        className="mb-0.5 ml-2 rounded-lg p-2 text-red-500 hover:bg-red-50"
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
                     )}
                   </div>
                 </div>
-                <p className="mt-2 text-right text-xs text-gray-500">
-                  IVA: {formatCurrency(ivaAmount)} | Total: {formatCurrency(subtotal + ivaAmount)}
-                </p>
+                {!esC && (
+                  <p className="mt-2 text-right text-xs text-gray-400">
+                    IVA: {formatCurrency(ivaAmount)} | Total: {formatCurrency(subtotal + ivaAmount)}
+                  </p>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Service Dates */}
-      <div className="card">
-        <h3 className="mb-4 text-base font-semibold text-gray-900">
-          Fechas de Servicio
-        </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label className="label">Fecha Desde</label>
-            <input
-              type="date"
-              {...register('fchServDesde', { required: true })}
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="label">Fecha Hasta</label>
-            <input
-              type="date"
-              {...register('fchServHasta', { required: true })}
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="label">Vencimiento de Pago</label>
-            <input
-              type="date"
-              {...register('fchVtoPago', { required: true })}
-              className="input"
-            />
+      {/* Service Dates — only for Servicios / Productos y Servicios */}
+      {esServicio && (
+        <div className="card">
+          <h3 className="mb-4 text-base font-semibold text-gray-900">
+            Período de Servicio
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label className="label">Fecha Desde</label>
+              <input
+                type="date"
+                {...register('fchServDesde', { required: esServicio })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Fecha Hasta</label>
+              <input
+                type="date"
+                {...register('fchServHasta', { required: esServicio })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Vencimiento de Pago</label>
+              <input
+                type="date"
+                {...register('fchVtoPago', { required: esServicio })}
+                className="input"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Observations */}
       <div className="card">
@@ -509,21 +630,23 @@ export default function NewInvoice() {
         <h3 className="mb-4 text-base font-semibold text-gray-900">Resumen</h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Neto Gravado</span>
+            <span className="text-gray-600">{esC ? 'Importe Neto' : 'Neto Gravado'}</span>
             <span className="font-medium">{formatCurrency(totals.impNeto)}</span>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">IVA</span>
-            <span className="font-medium">{formatCurrency(totals.impIVA)}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">No Gravado</span>
-            <span className="font-medium">{formatCurrency(totals.impTotConc)}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Exento</span>
-            <span className="font-medium">{formatCurrency(totals.impOpEx)}</span>
-          </div>
+          {!esC && (
+            <>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">IVA</span>
+                <span className="font-medium">{formatCurrency(totals.impIVA)}</span>
+              </div>
+              {totals.impTotConc > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">No Gravado</span>
+                  <span className="font-medium">{formatCurrency(totals.impTotConc)}</span>
+                </div>
+              )}
+            </>
+          )}
           <div className="border-t border-gray-200 pt-2">
             <div className="flex items-center justify-between">
               <span className="text-lg font-bold text-gray-900">TOTAL</span>
@@ -551,7 +674,7 @@ export default function NewInvoice() {
         >
           {submitting ? (
             <>
-              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               Emitiendo...
             </>
           ) : (

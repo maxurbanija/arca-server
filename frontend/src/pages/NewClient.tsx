@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { createClient, getClient, updateClient } from '../api/client';
+import { MagnifyingGlassIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { createClient, getClient, updateClient, consultarCuit } from '../api/client';
 
 interface ClientFormData {
   name: string;
@@ -19,12 +20,16 @@ export default function NewClient() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!!id);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [cuitFound, setCuitFound] = useState(false);
   const isEditing = !!id;
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ClientFormData>({
     defaultValues: {
@@ -37,6 +42,9 @@ export default function NewClient() {
       phone: '',
     },
   });
+
+  const watchDocType = Number(watch('docType'));
+  const watchDocNumber = watch('docNumber');
 
   useEffect(() => {
     if (!id) return;
@@ -62,6 +70,50 @@ export default function NewClient() {
     }
     load();
   }, [id, reset, navigate]);
+
+  const lookupCuit = async () => {
+    const cuit = watchDocNumber?.replace(/\D/g, '');
+    if (!cuit || cuit.length < 11) {
+      toast.error('Ingresá un CUIT válido (11 dígitos)');
+      return;
+    }
+
+    try {
+      setLookingUp(true);
+      setCuitFound(false);
+      const contribuyente = await consultarCuit(Number(cuit));
+
+      setValue('name', contribuyente.nombre);
+
+      if (contribuyente.domicilioFiscal?.direccion) {
+        const parts = [
+          contribuyente.domicilioFiscal.direccion,
+          contribuyente.domicilioFiscal.localidad,
+          contribuyente.domicilioFiscal.codPostal,
+        ].filter(Boolean);
+        setValue('address', parts.join(', '));
+      }
+
+      // Inferir condición IVA de los impuestos
+      if (contribuyente.impuestos) {
+        const impIds = contribuyente.impuestos.map((i) => i.id);
+        if (impIds.includes(32)) {
+          setValue('ivaCondition', 1); // Responsable Inscripto
+        } else if (impIds.includes(20)) {
+          setValue('ivaCondition', 6); // Monotributista
+        } else if (impIds.includes(34)) {
+          setValue('ivaCondition', 4); // Exento
+        }
+      }
+
+      setCuitFound(true);
+      toast.success(`Datos cargados: ${contribuyente.nombre}`);
+    } catch {
+      toast.error('No se encontró el CUIT en el padrón de AFIP');
+    } finally {
+      setLookingUp(false);
+    }
+  };
 
   const onSubmit = async (data: ClientFormData) => {
     try {
@@ -93,7 +145,7 @@ export default function NewClient() {
   if (fetching) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-indigo-600 border-t-transparent" />
       </div>
     );
   }
@@ -107,20 +159,6 @@ export default function NewClient() {
           </h3>
 
           <div className="space-y-4">
-            {/* Name */}
-            <div>
-              <label className="label">Nombre / Razon Social *</label>
-              <input
-                type="text"
-                {...register('name', { required: 'El nombre es requerido' })}
-                className="input"
-                placeholder="Juan Perez S.A."
-              />
-              {errors.name && (
-                <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-              )}
-            </div>
-
             {/* Document */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -136,24 +174,62 @@ export default function NewClient() {
                 </select>
               </div>
               <div>
-                <label className="label">Numero de Documento *</label>
-                <input
-                  type="text"
-                  {...register('docNumber', {
-                    required: 'El documento es requerido',
-                  })}
-                  className="input"
-                  placeholder="20123456789"
-                />
+                <label className="label">Número de Documento *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    {...register('docNumber', {
+                      required: 'El documento es requerido',
+                    })}
+                    className="input flex-1"
+                    placeholder="20123456789"
+                  />
+                  {watchDocType === 80 && (
+                    <button
+                      type="button"
+                      onClick={lookupCuit}
+                      disabled={lookingUp}
+                      className="btn-secondary flex-shrink-0"
+                      title="Buscar en padrón AFIP"
+                    >
+                      {lookingUp ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                      ) : cuitFound ? (
+                        <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <MagnifyingGlassIcon className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
                 {errors.docNumber && (
                   <p className="mt-1 text-xs text-red-600">{errors.docNumber.message}</p>
+                )}
+                {watchDocType === 80 && !isEditing && (
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Ingresá el CUIT y hacé click en la lupa para completar los datos desde AFIP
+                  </p>
                 )}
               </div>
             </div>
 
+            {/* Name */}
+            <div>
+              <label className="label">Nombre / Razón Social *</label>
+              <input
+                type="text"
+                {...register('name', { required: 'El nombre es requerido' })}
+                className="input"
+                placeholder="Juan Pérez S.A."
+              />
+              {errors.name && (
+                <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
+              )}
+            </div>
+
             {/* IVA Condition */}
             <div>
-              <label className="label">Condicion frente al IVA *</label>
+              <label className="label">Condición frente al IVA *</label>
               <select
                 {...register('ivaCondition', { valueAsNumber: true })}
                 className="select"
@@ -188,7 +264,7 @@ export default function NewClient() {
                 />
               </div>
               <div>
-                <label className="label">Telefono</label>
+                <label className="label">Teléfono</label>
                 <input
                   type="text"
                   {...register('phone')}
@@ -212,7 +288,7 @@ export default function NewClient() {
           <button type="submit" disabled={loading} className="btn-primary">
             {loading ? (
               <>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 Guardando...
               </>
             ) : isEditing ? (

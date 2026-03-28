@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeftIcon,
   PrinterIcon,
   QrCodeIcon,
+  ReceiptRefundIcon,
 } from '@heroicons/react/24/outline';
 import { getInvoice } from '../api/client';
 import type { Invoice } from '../types';
@@ -67,10 +68,21 @@ export default function InvoiceDetail() {
           <ArrowLeftIcon className="mr-2 h-4 w-4" />
           Volver
         </button>
-        <button onClick={() => window.print()} className="btn-secondary">
-          <PrinterIcon className="mr-2 h-4 w-4" />
-          Imprimir
-        </button>
+        <div className="flex gap-2">
+          {[1, 6, 11].includes(invoice.cbteTipo) && invoice.cae && (
+            <Link
+              to={`/facturas/nota?facturaId=${invoice.id}`}
+              className="btn-secondary"
+            >
+              <ReceiptRefundIcon className="mr-2 h-4 w-4" />
+              NC / ND
+            </Link>
+          )}
+          <button onClick={() => window.print()} className="btn-secondary">
+            <PrinterIcon className="mr-2 h-4 w-4" />
+            Imprimir
+          </button>
+        </div>
       </div>
 
       {/* Invoice Header */}

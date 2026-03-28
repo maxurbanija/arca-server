@@ -12,8 +12,11 @@ const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
   '/facturas': 'Facturas',
   '/facturas/nueva': 'Nueva Factura',
+  '/facturas/nota': 'Nota de Crédito / Débito',
   '/clientes': 'Clientes',
   '/clientes/nuevo': 'Nuevo Cliente',
+  '/consulta': 'Consultar Comprobante',
+  '/parametros': 'Parámetros AFIP',
   '/configuracion': 'Configuración',
   '/api-keys': 'API Keys',
 };

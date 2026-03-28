@@ -9,6 +9,9 @@ import {
   XMarkIcon,
   UserPlusIcon,
   DocumentDuplicateIcon,
+  ReceiptRefundIcon,
+  MagnifyingGlassCircleIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -28,6 +31,7 @@ const navSections = [
     items: [
       { name: 'Facturas', href: '/facturas', icon: DocumentTextIcon },
       { name: 'Nueva Factura', href: '/facturas/nueva', icon: PlusCircleIcon },
+      { name: 'NC / ND', href: '/facturas/nota', icon: ReceiptRefundIcon },
     ],
   },
   {
@@ -35,6 +39,13 @@ const navSections = [
     items: [
       { name: 'Clientes', href: '/clientes', icon: UsersIcon },
       { name: 'Nuevo Cliente', href: '/clientes/nuevo', icon: UserPlusIcon },
+    ],
+  },
+  {
+    label: 'AFIP',
+    items: [
+      { name: 'Consultar Cbte.', href: '/consulta', icon: MagnifyingGlassCircleIcon },
+      { name: 'Parámetros', href: '/parametros', icon: TableCellsIcon },
     ],
   },
   {
