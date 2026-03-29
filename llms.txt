@@ -1,89 +1,120 @@
 # ARCA Server — LLM Context
 
 ## What is this project?
-ARCA Server is a full-stack Argentine electronic invoicing system (facturación electrónica) that integrates with AFIP/ARCA web services. It allows businesses to issue invoices (Facturas A/B/C), credit notes, debit notes, and query taxpayer data — all through AFIP's official SOAP-based APIs.
+ARCA Server is a full-stack Argentine electronic invoicing system (facturación electrónica) that integrates with AFIP/ARCA web services. It allows businesses to issue invoices (Facturas A/B/C), credit notes, debit notes, query taxpayer data, and generate AFIP certificates — all through AFIP's official SOAP-based APIs.
 
 ## Architecture
-- **Backend:** Express 5.2 (TypeScript 6), Prisma 7 (PostgreSQL, driver adapter), Zod 4, @ramiidv/arca-sdk
+- **Backend:** Express 5.2 (TypeScript 6), Prisma 7 (PostgreSQL, driver adapter @prisma/adapter-pg), Zod 4, @ramiidv/arca-sdk, arca-cert
 - **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite, no postcss.config), React Hook Form 7
-- **SDK:** @ramiidv/arca-sdk v1.1+ handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón)
+- **SDK:** @ramiidv/arca-sdk v1.1+ handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón, CAEA, QR)
+- **Certificates:** arca-cert handles automated AFIP certificate generation/renewal via portal login
 
 ## Key Files
 
 ### Backend
-- `backend/src/index.ts` — Express app setup, middleware, routes
-- `backend/src/config/index.ts` — Environment config (AFIP certs, JWT, DB)
-- `backend/src/services/arca.service.ts` — Arca SDK instance with event logging
-- `backend/src/services/invoice.service.ts` — Invoice/NC/ND creation with QR generation
-- `backend/src/lib/prisma.ts` — Shared Prisma 7 client with PrismaPg adapter
-- `backend/src/middleware/auth.ts` — JWT + hashed API key authentication
-- `backend/src/middleware/errorHandler.ts` — Error handler with ArcaError support
-- `backend/src/routes/afip.ts` — AFIP parameter/query endpoints (15 routes)
-- `backend/src/routes/invoices.ts` — Invoice CRUD + NC/ND endpoints
-- `backend/src/routes/auth.ts` — Auth + API key management
-- `backend/src/routes/clients.ts` — Client CRUD
-- `backend/prisma/schema.prisma` — DB schema (User, ApiKey, Client, Invoice, InvoiceItem)
-- `backend/prisma.config.ts` — Prisma 7 config with datasource URL
-- `backend/tests/arca-sdk.test.ts` — 48 tests (unit + integration)
-- `backend/vitest.config.ts` — Test configuration
+- `backend/src/index.ts` — Express app with Helmet (CSP, HSTS, frame-ancestors:none), CORS, rate limiting (200/15min global, 20/15min auth), body limit 1MB
+- `backend/src/config/index.ts` — Environment config. JWT_SECRET and DATABASE_URL are required (no defaults, throws on missing)
+- `backend/src/services/arca.service.ts` — Arca SDK instance via Proxy pattern (allows hot-reload on cert change). Event logging for auth, requests, retries, errors. `reloadArca(production?)` recreates instance without server restart
+- `backend/src/services/invoice.service.ts` — createInvoice (facturar), createNotaCredito, createNotaDebito, QR generation via Arca.generateQRUrl(), shared saveComprobante helper
+- `backend/src/lib/prisma.ts` — Single shared Prisma 7 client with PrismaPg driver adapter
+- `backend/src/middleware/auth.ts` — JWT Bearer + API key (SHA-256 hashed, looked up by hash). API keys authenticated via X-API-Key header
+- `backend/src/middleware/errorHandler.ts` — Handles AppError, ArcaAuthError (503), ArcaWSFEError (400 with errors[]), ArcaSoapError (502 with parseSoapFault for clean messages), ArcaCertError (status mapped by code), ArcaError (400), PrismaErrors, ZodError
+- `backend/src/routes/afip.ts` — 19 routes: AFIP params (7), cert management (4), contribuyente, comprobante, cotizacion, puntos-venta, last-voucher, status, tributo-types
+- `backend/src/routes/invoices.ts` — POST / (create), POST /nota-credito, POST /nota-debito, GET / (list with filters: cbteTipo, clientId, from, to), GET /stats, GET /:id
+- `backend/src/routes/auth.ts` — register (first user = admin), login (JWT), me, api-keys CRUD (max 5 per user, SHA-256 hashed, keyHint for display)
+- `backend/src/routes/clients.ts` — CRUD with search by name/docNumber, delete protection (fails if client has invoices)
+- `backend/prisma/schema.prisma` — User, ApiKey (key=hash, keyHint=mask), Client, Invoice (qrUrl, resultado A/R, monId, monCotiz), InvoiceItem
+- `backend/prisma.config.ts` — Prisma 7 config (@ts-nocheck, executed by Prisma CLI not tsc)
+- `backend/tests/arca-sdk.test.ts` — 48 vitest tests (unit + integration-ready)
+- `backend/vitest.config.ts` — 60s test timeout
 
 ### Frontend
-- `frontend/src/App.tsx` — Routes (13 pages)
-- `frontend/src/api/client.ts` — Axios API client (25+ functions)
-- `frontend/src/components/Layout.tsx` — Main layout with header, skip-link
-- `frontend/src/components/Sidebar.tsx` — Navigation (5 sections: General, Facturación, Gestión, AFIP, Sistema)
-- `frontend/src/pages/Dashboard.tsx` — Stats, recent invoices, AFIP status
-- `frontend/src/pages/NewInvoice.tsx` — Invoice form with type-aware validation
-- `frontend/src/pages/NewNotaCredDeb.tsx` — Credit/debit note creation
-- `frontend/src/pages/InvoiceList.tsx` — Invoice listing with filters
-- `frontend/src/pages/InvoiceDetail.tsx` — Invoice detail with QR link
-- `frontend/src/pages/NewClient.tsx` — Client form with CUIT lookup from AFIP
-- `frontend/src/pages/ConsultaComprobante.tsx` — Query invoices in AFIP
-- `frontend/src/pages/AfipParams.tsx` — AFIP parameter reference + exchange rates
-- `frontend/src/types/index.ts` — TypeScript types and constants
+- `frontend/src/App.tsx` — 14 routes (2 public: login/register, 12 protected)
+- `frontend/src/api/client.ts` — Axios client with 30s timeout, auto Bearer token, auto-logout on 401. 28 API functions including generateCert, renewCert, getCertInfo, testCert, consultarCuit, consultarComprobante, getCotizacion, all AFIP param getters
+- `frontend/src/utils/errors.ts` — getApiErrorMessage() extracts err.response.data.error over axios err.message, appends soapFault if present
+- `frontend/src/utils/formatters.ts` — formatCurrency (ARS), formatDate (YYYYMMDD → DD/MM/YYYY), formatCbteTipo, formatFullInvoiceNumber, formatDocType
+- `frontend/src/components/Layout.tsx` — Sticky header with glassmorphism blur, skip-to-content link, user menu with avatar initial
+- `frontend/src/components/Sidebar.tsx` — 5 sections: General, Facturación (Facturas, Nueva Factura, NC/ND), Gestión (Clientes, Nuevo Cliente), AFIP (Consultar Cbte., Parámetros), Sistema (API Keys, Configuración). AFIP status dot in footer
+- `frontend/src/components/InvoiceStatusBadge.tsx` — badge-green (Aprobada), badge-red (Rechazada), badge-yellow (Pendiente)
+- `frontend/src/pages/Dashboard.tsx` — Greeting by time of day, 4 stat cards (2-col mobile, 4-col desktop), AFIP status (hidden on mobile), recent invoices table (columns hidden on mobile), stats by type sidebar
+- `frontend/src/pages/NewInvoice.tsx` — Type-aware form: Factura A (forces CUIT, shows alert), Factura B (all doc types), Factura C (hides IVA selector, no IVA in totals). Dynamic punto de venta from getPuntosVenta(). Service dates only shown for concepto 2/3
+- `frontend/src/pages/NewNotaCredDeb.tsx` — NC/ND tabs, invoice search, type auto-inferred from original. Linked from InvoiceDetail with ?facturaId=
+- `frontend/src/pages/NewClient.tsx` — CUIT lookup button (consultarCuit) auto-fills name, address, IVA condition from AFIP padrón A13
+- `frontend/src/pages/ConsultaComprobante.tsx` — Query comprobante in AFIP by PV + type + number, shows full result with importes, CAE, dates
+- `frontend/src/pages/AfipParams.tsx` — 6 tabs (comprobantes, documentos, iva, conceptos, monedas, tributos), lazy-loaded, monedas tab has cotización lookup
+- `frontend/src/pages/Settings.tsx` — Cert status (expiry, days left, color-coded), generate/renew tabs, verify cert against WSAA, AFIP server status, app info. Production as default environment
+- `frontend/src/main.tsx` — Toaster with custom render: dismiss button (✕) on every toast, error toasts last 10s, success 5s
+- `frontend/src/index.css` — @import "tailwindcss", @utility directives (btn-primary/secondary/danger, card, input, label, select, table-header/cell, stat-card, empty-state, badge-green/red/yellow, skip-link). Touch targets 44px for pointer:coarse, touch-manipulation, prefers-reduced-motion, focus-visible, print styles, custom scrollbar
+- `frontend/src/types/index.ts` — Invoice (with qrUrl), Client, InvoiceItem, InvoiceStats, CBTE_TIPOS, DOC_TIPOS, IVA_ALICUOTAS, IVA_CONDITIONS constants
 
 ## AFIP Integration (via @ramiidv/arca-sdk)
 
 The SDK wraps AFIP's SOAP web services:
-- **WSAA** — Authentication (PKCS#7 signed TRA, token caching with dedup)
-- **WSFE** — Electronic invoicing (CAE requests, parameter queries, CAEA)
-- **WSFEX** — Export invoicing
-- **Padrón A5/A13** — Taxpayer data queries
+- **WSAA** — Authentication (PKCS#7 signed TRA, token caching with dedup, 2min expiry margin, retry with backoff)
+- **WSFE** — Electronic invoicing (CAE requests, parameter queries, CAEA support)
+- **WSFEX** — Export invoicing (facturarExpo, countries, incoterms, currencies)
+- **Padrón A5/A13** — Taxpayer data queries (consultarCuit, consultarCuitDetalle)
+- **QR** — Official AFIP QR URL generation (Arca.generateQRUrl)
 
-Key SDK methods used:
+Key SDK methods used in this project:
 - `arca.facturar(opts)` — Simplified invoice creation (auto-calculates IVA, totals, numbering)
-- `arca.notaCredito(opts)` / `arca.notaDebito(opts)` — NC/ND with type inference
-- `arca.consultarCuit(cuit)` — Taxpayer lookup
-- `arca.consultarComprobante(tipo, pv, nro)` — Invoice query
-- `arca.getPuntosVenta()` — Sales points
-- `arca.getTiposComprobante/Documento/Iva/Concepto/etc()` — AFIP parameters
-- `arca.getCotizacion(monedaId)` — Exchange rates
-- `arca.serverStatus()` — AFIP server health
+- `arca.notaCredito(opts)` / `arca.notaDebito(opts)` — NC/ND with type inference from NOTA_CREDITO_MAP/NOTA_DEBITO_MAP
+- `arca.consultarCuit(cuit)` — Taxpayer lookup (nombre, tipoPersona, estadoClave, domicilioFiscal, impuestos)
+- `arca.consultarComprobante(tipo, pv, nro)` — Invoice query in AFIP
+- `arca.getPuntosVenta()` — Active sales points
+- `arca.getTiposComprobante/Documento/Iva/Concepto/Monedas/Tributo/Opcional()` — AFIP parameters
+- `arca.getCotizacion(monedaId)` — Official exchange rates
+- `arca.serverStatus()` / `arca.serverStatusExpo()` — AFIP server health
 - `Arca.generateQRUrl(input)` — Official AFIP QR URL
-- `Arca.formatDate(date)` — Date formatting with Argentina timezone
-- `Arca.calcularTotales(items)` — Preview IVA/totals without calling AFIP
+- `Arca.formatDate(date)` — YYYYMMDD with America/Argentina/Buenos_Aires timezone
+- `Arca.calcularTotales(items, opts)` — Preview IVA/totals (supports tipoC, tributos, exentos, no gravados)
+- `Arca.extractCAE(result)` — Parse raw FECAESolicitar response
+
+## Certificate Management (via arca-cert)
+
+The arca-cert package automates AFIP certificate lifecycle:
+- `createCertificate({cuit, password, alias, environment})` — Login to AFIP portal with clave fiscal, generate CSR, get signed cert from WSASS
+- `renewCertificate({...})` — Creates new cert with timestamped alias suffix
+- `getCertExpiry(certPem)` — Parse X.509 notBefore/notAfter dates
+- `authenticate({cert, key, service, environment})` — Test cert against WSAA
+- `parseSoapFault(body)` — Parse SOAP faults with contextual hints (e.g., "Estás usando el ambiente correcto?")
+- Error handling: ArcaCertError with codes (INVALID_CUIT, LOGIN_FAILED, SESSION_EXPIRED, WSAA_ERROR, CERTIFICATE_ERROR, etc.) mapped to HTTP status codes in errorHandler
 
 ## Invoice Types and Rules
-- **Factura A (tipo 1):** Responsable Inscripto → RI. Requires CUIT. Discriminates IVA.
-- **Factura B (tipo 6):** RI → Consumidor Final/Mono/Exento. DocTipo optional. Discriminates IVA.
-- **Factura C (tipo 11):** Monotributista → anyone. DocTipo optional. Does NOT discriminate IVA.
-- **NC/ND:** Created from existing invoices. Type auto-inferred (e.g., Factura B → NC B).
-- **Service dates:** Only required when concepto = Servicios (2) or Productos y Servicios (3).
+- **Factura A (tipo 1):** Responsable Inscripto → RI. Requires CUIT (DocTipo=80). Discriminates IVA.
+- **Factura B (tipo 6):** RI → Consumidor Final/Mono/Exento. DocTipo optional (99=CF, 80=CUIT, 96=DNI, 86=CUIL). Discriminates IVA.
+- **Factura C (tipo 11):** Monotributista → anyone. DocTipo optional. Does NOT discriminate IVA (isTipoC).
+- **NC/ND (3,8,13 / 2,7,12):** Created from existing invoices via notaCredito/notaDebito. Type auto-inferred from original.
+- **Service dates:** FchServDesde/FchServHasta/FchVtoPago only required when concepto = Servicios (2) or Productos y Servicios (3).
 
 ## Security
-- Helmet with CSP, HSTS, referrer-policy, frame-ancestors:none
-- API keys hashed with SHA-256 before storage
-- JWT secret required (no insecure defaults)
-- Rate limiting: 200 req/15min global, 20 req/15min auth
-- CORS restricted to frontend origin
-- SDK errors mapped to proper HTTP status codes
+- Helmet with CSP (default-src 'self', img-src includes afip.gob.ar for QR), HSTS 1 year, referrer-policy strict-origin-when-cross-origin, frame-ancestors 'none'
+- API keys hashed with SHA-256 before storage (max 5 per user, keyHint field for display mask)
+- JWT secret required (no default — server crashes on missing)
+- DATABASE_URL required (no default)
+- Rate limiting: 200 req/15min global (all endpoints), 20 req/15min auth-specific (/api/auth/*)
+- CORS default: http://localhost:5173 (not wildcard)
+- Body limit: 1MB
+- SOAP fault parsing: parseSoapFault() from arca-cert provides human-readable errors with contextual hints
+- ArcaCertError codes mapped to HTTP status: INVALID_CUIT→400, LOGIN_FAILED→401, SESSION_EXPIRED→401, PORTAL_ERROR→502, WSAA_ERROR→502, CERTIFICATE_ERROR→422, NETWORK_ERROR→502
 
 ## Database (Prisma 7 + PostgreSQL)
-- Uses driver adapter (@prisma/adapter-pg) — no Rust engine
-- Generated client at `src/generated/prisma/`
+- Uses driver adapter (@prisma/adapter-pg) — no Rust engine, pure JS
+- Generated client at `src/generated/prisma/` (gitignored, regenerated on npm install via postinstall script)
 - Single shared instance via `src/lib/prisma.ts`
-- Models: User, ApiKey (hashed), Client, Invoice (with qrUrl), InvoiceItem
+- Models:
+  - **User**: email (unique), password (bcrypt 12 rounds), name, role (admin/user)
+  - **ApiKey**: key (SHA-256 hash, unique, indexed), keyHint (first 12 + last 4 chars), userId, lastUsed
+  - **Client**: name, docType, docNumber (indexed), ivaCondition, address, email, phone. Cannot delete if has invoices
+  - **Invoice**: cbteTipo+puntoVenta+cbteNro (unique), all IMP fields as Decimal(15,2), cae, caeFchVto, resultado (A/R), qrUrl, monId, monCotiz as Decimal(15,6), observations
+  - **InvoiceItem**: description, quantity Decimal(15,4), unitPrice Decimal(15,2), ivaId, ivaRate, subtotal, ivaAmount
 
 ## Testing
-- 48 vitest tests: SDK constants, formatDate, calcularTotales, extractCAE, generateQRUrl, error classes
-- Integration tests auto-skip without certs (run with AFIP_CUIT env + certs in backend/certs/)
+- 48 vitest tests covering:
+  - SDK constants and enums (IVA_RATES, CbteTipo, Concepto, DocTipo, Moneda, NOTA_CREDITO_MAP, NOTA_DEBITO_MAP)
+  - Arca.formatDate() with timezone handling (accepts Date and string)
+  - Arca.generateQRUrl() URL generation and uniqueness
+  - Arca.calcularTotales() — IVA 21%, multiple aliquots, grouping, exentos, no gravados, mixed, tipoC, iva+exento validation, unknown IvaTipo, IVA 0%, tributos
+  - Arca.extractCAE() — approved, rejected, array of FECAEDetResponse
+  - Error classes — ArcaError, ArcaAuthError, ArcaWSFEError (structured errors[]), ArcaSoapError (statusCode)
+  - Integration tests (auto-skip without certs): serverStatus, getTipos*, getMonedas, getPuntosVenta, ultimoComprobante, siguienteComprobante, facturar B, facturar C, servicios, notaCredito, consultarComprobante, consultarCuit, serverStatusExpo
