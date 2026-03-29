@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ArcaAuthError, ArcaWSFEError, ArcaSoapError, ArcaError } from '@ramiidv/arca-sdk';
+import { ArcaCertError, parseSoapFault } from 'arca-cert';
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -69,6 +70,19 @@ export function errorHandler(
 
   if (err instanceof ArcaSoapError) {
     const status = err.statusCode || 502;
+    // Try to parse SOAP fault from the error message for a cleaner response
+    const fault = parseSoapFault(err.message);
+    if (fault?.soapFault) {
+      res.status(status).json({
+        success: false,
+        error: fault.message,
+        soapFault: {
+          faultcode: fault.soapFault.faultcode,
+          faultstring: fault.soapFault.faultstring,
+        },
+      });
+      return;
+    }
     res.status(status).json({
       success: false,
       error: 'AFIP service unavailable',
@@ -82,6 +96,41 @@ export function errorHandler(
       success: false,
       error: err.message,
     });
+    return;
+  }
+
+  // arca-cert errors
+  if (err instanceof ArcaCertError) {
+    const statusMap: Record<string, number> = {
+      INVALID_CUIT: 400,
+      INVALID_ALIAS: 400,
+      INVALID_SERVICE: 400,
+      LOGIN_FAILED: 401,
+      SESSION_EXPIRED: 401,
+      PORTAL_ERROR: 502,
+      WSAA_ERROR: 502,
+      WSASS_ERROR: 502,
+      CERTIFICATE_ERROR: 422,
+      CRYPTO_ERROR: 500,
+      NETWORK_ERROR: 502,
+      UNSAFE_URL: 400,
+    };
+    const status = statusMap[err.code] || 400;
+
+    const response: Record<string, unknown> = {
+      success: false,
+      error: err.message,
+      code: err.code,
+    };
+
+    if (err.soapFault) {
+      response.soapFault = {
+        faultcode: err.soapFault.faultcode,
+        faultstring: err.soapFault.faultstring,
+      };
+    }
+
+    res.status(status).json(response);
     return;
   }
 

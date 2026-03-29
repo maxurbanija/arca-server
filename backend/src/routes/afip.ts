@@ -1,5 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { arca } from '../services/arca.service';
+import fs from 'fs';
+import path from 'path';
+import { createCertificate } from 'arca-cert';
+import { arca, reloadArca } from '../services/arca.service';
+import { config } from '../config';
 
 const router = Router();
 
@@ -170,6 +174,51 @@ router.get('/tributo-types', async (_req: Request, res: Response, next: NextFunc
   try {
     const types = await arca.getTiposTributo();
     res.json({ success: true, data: types });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /generate-cert - Generate AFIP certificate using arca-cert
+router.post('/generate-cert', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { cuit, password, alias, environment } = req.body;
+
+    if (!cuit || !password || !alias) {
+      res.status(400).json({
+        success: false,
+        error: 'cuit, password, and alias are required',
+      });
+      return;
+    }
+
+    const result = await createCertificate({
+      cuit: String(cuit),
+      password: String(password),
+      alias: String(alias),
+      environment: environment || 'testing',
+    });
+
+    // Save cert and key to disk
+    const certsDir = path.resolve(__dirname, '../../certs');
+    fs.mkdirSync(certsDir, { recursive: true });
+    fs.writeFileSync(path.join(certsDir, 'cert.crt'), result.cert);
+    fs.writeFileSync(path.join(certsDir, 'key.key'), result.key, { mode: 0o600 });
+
+    // Reload SDK with new certs, matching the cert's environment
+    reloadArca(result.environment === 'production');
+
+    res.json({
+      success: true,
+      data: {
+        alias: result.alias,
+        cuit: result.cuit,
+        environment: result.environment,
+        certPath: path.join(certsDir, 'cert.crt'),
+        keyPath: path.join(certsDir, 'key.key'),
+        message: 'Certificado generado y activado.',
+      },
+    });
   } catch (error) {
     next(error);
   }

@@ -18,6 +18,7 @@
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "@ramiidv/arca-sdk": "^1.1.4",
+    "arca-cert": "^0.1.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

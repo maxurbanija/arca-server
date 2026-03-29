@@ -196,4 +196,9 @@ export async function getAfipOptionalTypes() {
   return data;
 }
 
+export async function generateCert(data: { cuit: string; password: string; alias: string; environment?: string }) {
+  const { data: result } = await api.post('/afip/generate-cert', data, { timeout: 120000 });
+  return result;
+}
+
 export default api;
