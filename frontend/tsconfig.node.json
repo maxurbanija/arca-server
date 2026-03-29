@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
-    "target": "ES2022",
+    "target": "ES2023",
     "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
@@ -11,6 +11,7 @@
     "moduleDetection": "force",
     "emitDeclarationOnly": true,
     "declaration": true,
+    "declarationDir": "./dist",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
