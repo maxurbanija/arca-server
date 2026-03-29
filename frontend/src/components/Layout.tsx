@@ -49,6 +49,9 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50/80">
+      <a href="#main-content" className="skip-link">
+        Saltar al contenido
+      </a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64">
@@ -108,7 +111,7 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main id="main-content" className="p-4 sm:p-6 lg:p-8" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

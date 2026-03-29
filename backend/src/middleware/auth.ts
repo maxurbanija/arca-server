@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
-
-const prisma = new PrismaClient();
 
 export interface AuthPayload {
   userId: number;
@@ -23,8 +22,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   // Check for API key first
   const apiKey = req.header('X-API-Key');
   if (apiKey) {
+    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
     prisma.apiKey
-      .findUnique({ where: { key: apiKey }, include: { user: true } })
+      .findUnique({ where: { key: keyHash }, include: { user: true } })
       .then((record) => {
         if (!record) {
           res.status(401).json({ success: false, error: 'Invalid API key' });

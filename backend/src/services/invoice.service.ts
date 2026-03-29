@@ -1,11 +1,10 @@
-import { PrismaClient, Prisma } from '@prisma/client';
-import { Arca, IVA_RATES, Concepto, CbteTipo } from '@ramiidv/arca-sdk';
+import { Prisma } from '../generated/prisma/client';
+import { Arca, IVA_RATES, Concepto } from '@ramiidv/arca-sdk';
 import type { FacturarOpts, LineItem, FacturaResult } from '@ramiidv/arca-sdk';
+import { prisma } from '../lib/prisma';
 import { arca } from './arca.service';
 import { config } from '../config';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 interface InvoiceItemInput {
   description: string;

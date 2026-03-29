@@ -2,13 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import { authMiddleware, AuthPayload } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const registerSchema = z.object({
   email: z.string().email('Email invalido'),
@@ -29,7 +28,7 @@ function generateToken(user: { id: number; email: string; role: string }): strin
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role } as AuthPayload,
     config.jwtSecret,
-    { expiresIn: config.jwtExpiresIn }
+    { expiresIn: config.jwtExpiresIn as unknown as number }
   );
 }
 
@@ -116,15 +115,10 @@ router.get('/api-keys', authMiddleware, async (req: Request, res: Response, next
   try {
     const keys = await prisma.apiKey.findMany({
       where: { userId: req.user!.userId },
-      select: { id: true, name: true, key: true, lastUsed: true, createdAt: true },
+      select: { id: true, name: true, keyHint: true, lastUsed: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
-    // Mask keys — only show first 8 and last 4 chars
-    const masked = keys.map((k) => ({
-      ...k,
-      key: k.key.slice(0, 8) + '...' + k.key.slice(-4),
-    }));
-    res.json({ success: true, apiKeys: masked });
+    res.json({ success: true, apiKeys: keys });
   } catch (err) {
     next(err);
   }
@@ -142,14 +136,16 @@ router.post('/api-keys', authMiddleware, async (req: Request, res: Response, nex
     }
 
     const rawKey = `arca_${crypto.randomBytes(32).toString('hex')}`;
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+    const keyHint = rawKey.slice(0, 12) + '...' + rawKey.slice(-4);
 
     const apiKey = await prisma.apiKey.create({
-      data: { name, key: rawKey, userId: req.user!.userId },
-      select: { id: true, name: true, key: true, createdAt: true },
+      data: { name, key: keyHash, keyHint, userId: req.user!.userId },
+      select: { id: true, name: true, createdAt: true },
     });
 
-    // Return the full key only on creation
-    res.status(201).json({ success: true, apiKey });
+    // Return the full key only on creation — it cannot be retrieved again
+    res.status(201).json({ success: true, apiKey: { ...apiKey, key: rawKey } });
   } catch (err) {
     next(err);
   }
@@ -158,7 +154,7 @@ router.post('/api-keys', authMiddleware, async (req: Request, res: Response, nex
 // DELETE /api/auth/api-keys/:id
 router.delete('/api-keys/:id', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const apiKey = await prisma.apiKey.findFirst({
       where: { id, userId: req.user!.userId },
     });

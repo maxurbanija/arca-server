@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const createClientSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
@@ -79,7 +78,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // GET /:id - Get client with invoice count
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ success: false, error: 'Invalid client ID' });
       return;
@@ -105,7 +104,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // PUT /:id - Update client
 router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ success: false, error: 'Invalid client ID' });
       return;
@@ -132,7 +131,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // DELETE /:id - Delete client (only if no invoices)
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ success: false, error: 'Invalid client ID' });
       return;

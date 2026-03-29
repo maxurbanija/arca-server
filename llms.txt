@@ -1,0 +1,89 @@
+# ARCA Server — LLM Context
+
+## What is this project?
+ARCA Server is a full-stack Argentine electronic invoicing system (facturación electrónica) that integrates with AFIP/ARCA web services. It allows businesses to issue invoices (Facturas A/B/C), credit notes, debit notes, and query taxpayer data — all through AFIP's official SOAP-based APIs.
+
+## Architecture
+- **Backend:** Express 5 (TypeScript), Prisma 7 (PostgreSQL), @ramiidv/arca-sdk
+- **Frontend:** React 19, Vite, Tailwind CSS, React Hook Form
+- **SDK:** @ramiidv/arca-sdk handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón)
+
+## Key Files
+
+### Backend
+- `backend/src/index.ts` — Express app setup, middleware, routes
+- `backend/src/config/index.ts` — Environment config (AFIP certs, JWT, DB)
+- `backend/src/services/arca.service.ts` — Arca SDK instance with event logging
+- `backend/src/services/invoice.service.ts` — Invoice/NC/ND creation with QR generation
+- `backend/src/lib/prisma.ts` — Shared Prisma 7 client with PrismaPg adapter
+- `backend/src/middleware/auth.ts` — JWT + hashed API key authentication
+- `backend/src/middleware/errorHandler.ts` — Error handler with ArcaError support
+- `backend/src/routes/afip.ts` — AFIP parameter/query endpoints (15 routes)
+- `backend/src/routes/invoices.ts` — Invoice CRUD + NC/ND endpoints
+- `backend/src/routes/auth.ts` — Auth + API key management
+- `backend/src/routes/clients.ts` — Client CRUD
+- `backend/prisma/schema.prisma` — DB schema (User, ApiKey, Client, Invoice, InvoiceItem)
+- `backend/prisma.config.ts` — Prisma 7 config with datasource URL
+- `backend/tests/arca-sdk.test.ts` — 48 tests (unit + integration)
+- `backend/vitest.config.ts` — Test configuration
+
+### Frontend
+- `frontend/src/App.tsx` — Routes (13 pages)
+- `frontend/src/api/client.ts` — Axios API client (25+ functions)
+- `frontend/src/components/Layout.tsx` — Main layout with header, skip-link
+- `frontend/src/components/Sidebar.tsx` — Navigation (5 sections: General, Facturación, Gestión, AFIP, Sistema)
+- `frontend/src/pages/Dashboard.tsx` — Stats, recent invoices, AFIP status
+- `frontend/src/pages/NewInvoice.tsx` — Invoice form with type-aware validation
+- `frontend/src/pages/NewNotaCredDeb.tsx` — Credit/debit note creation
+- `frontend/src/pages/InvoiceList.tsx` — Invoice listing with filters
+- `frontend/src/pages/InvoiceDetail.tsx` — Invoice detail with QR link
+- `frontend/src/pages/NewClient.tsx` — Client form with CUIT lookup from AFIP
+- `frontend/src/pages/ConsultaComprobante.tsx` — Query invoices in AFIP
+- `frontend/src/pages/AfipParams.tsx` — AFIP parameter reference + exchange rates
+- `frontend/src/types/index.ts` — TypeScript types and constants
+
+## AFIP Integration (via @ramiidv/arca-sdk)
+
+The SDK wraps AFIP's SOAP web services:
+- **WSAA** — Authentication (PKCS#7 signed TRA, token caching with dedup)
+- **WSFE** — Electronic invoicing (CAE requests, parameter queries, CAEA)
+- **WSFEX** — Export invoicing
+- **Padrón A5/A13** — Taxpayer data queries
+
+Key SDK methods used:
+- `arca.facturar(opts)` — Simplified invoice creation (auto-calculates IVA, totals, numbering)
+- `arca.notaCredito(opts)` / `arca.notaDebito(opts)` — NC/ND with type inference
+- `arca.consultarCuit(cuit)` — Taxpayer lookup
+- `arca.consultarComprobante(tipo, pv, nro)` — Invoice query
+- `arca.getPuntosVenta()` — Sales points
+- `arca.getTiposComprobante/Documento/Iva/Concepto/etc()` — AFIP parameters
+- `arca.getCotizacion(monedaId)` — Exchange rates
+- `arca.serverStatus()` — AFIP server health
+- `Arca.generateQRUrl(input)` — Official AFIP QR URL
+- `Arca.formatDate(date)` — Date formatting with Argentina timezone
+- `Arca.calcularTotales(items)` — Preview IVA/totals without calling AFIP
+
+## Invoice Types and Rules
+- **Factura A (tipo 1):** Responsable Inscripto → RI. Requires CUIT. Discriminates IVA.
+- **Factura B (tipo 6):** RI → Consumidor Final/Mono/Exento. DocTipo optional. Discriminates IVA.
+- **Factura C (tipo 11):** Monotributista → anyone. DocTipo optional. Does NOT discriminate IVA.
+- **NC/ND:** Created from existing invoices. Type auto-inferred (e.g., Factura B → NC B).
+- **Service dates:** Only required when concepto = Servicios (2) or Productos y Servicios (3).
+
+## Security
+- Helmet with CSP, HSTS, referrer-policy, frame-ancestors:none
+- API keys hashed with SHA-256 before storage
+- JWT secret required (no insecure defaults)
+- Rate limiting: 200 req/15min global, 20 req/15min auth
+- CORS restricted to frontend origin
+- SDK errors mapped to proper HTTP status codes
+
+## Database (Prisma 7 + PostgreSQL)
+- Uses driver adapter (@prisma/adapter-pg) — no Rust engine
+- Generated client at `src/generated/prisma/`
+- Single shared instance via `src/lib/prisma.ts`
+- Models: User, ApiKey (hashed), Client, Invoice (with qrUrl), InvoiceItem
+
+## Testing
+- 48 vitest tests: SDK constants, formatDate, calcularTotales, extractCAE, generateQRUrl, error classes
+- Integration tests auto-skip without certs (run with AFIP_CUIT env + certs in backend/certs/)

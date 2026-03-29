@@ -87,6 +87,25 @@
   }
 }
 
+/* Accessibility — focus visible */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-indigo-500;
+}
+
+/* Skip to content link */
+.skip-link {
+  @apply absolute -top-10 left-4 z-[100] rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-all focus:top-4;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Print styles */
 @media print {
   .no-print {

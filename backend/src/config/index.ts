@@ -29,8 +29,8 @@ function getEnvInt(key: string, defaultValue: number): number {
 
 export const config = {
   port: getEnvInt('PORT', 3001),
-  databaseUrl: getEnv('DATABASE_URL', 'postgresql://localhost:5432/arca'),
-  jwtSecret: getEnv('JWT_SECRET', 'change-me-in-production'),
+  databaseUrl: getEnv('DATABASE_URL'),
+  jwtSecret: getEnv('JWT_SECRET'),
   jwtExpiresIn: getEnv('JWT_EXPIRES_IN', '7d'),
   afip: {
     cuit: getEnv('AFIP_CUIT', ''),

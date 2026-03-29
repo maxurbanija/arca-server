@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -22,6 +22,7 @@ model ApiKey {
   id        Int      @id @default(autoincrement())
   name      String
   key       String   @unique
+  keyHint   String   @default("")
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastUsed  DateTime?
