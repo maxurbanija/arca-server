@@ -61,21 +61,22 @@ export default function InvoiceList() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-500">{total} facturas encontradas</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="btn-secondary text-xs"
           >
-            <FunnelIcon className="mr-1 h-4 w-4" />
-            Filtros
+            <FunnelIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Filtros</span>
           </button>
-          <button disabled className="btn-secondary text-xs opacity-50" title="Proximamente">
-            <ArrowDownTrayIcon className="mr-1 h-4 w-4" />
+          <button disabled className="btn-secondary text-xs opacity-50 hidden sm:inline-flex" title="Proximamente">
+            <ArrowDownTrayIcon className="h-4 w-4" />
             Exportar
           </button>
           <Link to="/facturas/nueva" className="btn-primary text-xs">
-            <PlusCircleIcon className="mr-1 h-4 w-4" />
-            Nueva Factura
+            <PlusCircleIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Nueva Factura</span>
+            <span className="sm:hidden">Nueva</span>
           </Link>
         </div>
       </div>
@@ -211,17 +212,17 @@ export default function InvoiceList() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Pagina {page} de {totalPages}
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+          <p className="text-xs text-gray-500">
+            Página {page} de {totalPages}
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={() => goToPage(page - 1)}
               disabled={page <= 1}
               className="btn-secondary text-xs"
             >
-              Anterior
+              Ant.
             </button>
             {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
               const start = Math.max(1, Math.min(page - 2, totalPages - 4));
@@ -231,7 +232,7 @@ export default function InvoiceList() {
                 <button
                   key={p}
                   onClick={() => goToPage(p)}
-                  className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-medium ${
                     p === page
                       ? 'bg-indigo-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -246,7 +247,7 @@ export default function InvoiceList() {
               disabled={page >= totalPages}
               className="btn-secondary text-xs"
             >
-              Siguiente
+              Sig.
             </button>
           </div>
         </div>

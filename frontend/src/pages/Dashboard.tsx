@@ -94,7 +94,7 @@ export default function Dashboard() {
         </div>
 
         {afipStatus && (
-          <div className="flex items-center gap-3 rounded-lg border border-gray-200/80 bg-white px-4 py-2 shadow-sm">
+          <div className="hidden sm:flex items-center gap-3 rounded-lg border border-gray-200/80 bg-white px-4 py-2 shadow-sm">
             <span className="text-xs font-medium text-gray-500">AFIP</span>
             {['AppServer', 'DbServer', 'AuthServer'].map((server) => (
               <span key={server} className="inline-flex items-center gap-1 text-[11px] text-gray-600">
@@ -111,7 +111,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <div className="stat-card">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50">
             <DocumentTextIcon className="h-5 w-5 text-indigo-600" />
@@ -198,12 +198,12 @@ export default function Dashboard() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Tipo</th>
-                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Número</th>
-                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Fecha</th>
-                    <th className="px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Cliente</th>
-                    <th className="px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total</th>
-                    <th className="px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Estado</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Tipo</th>
+                    <th className="hidden sm:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Número</th>
+                    <th className="hidden sm:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Fecha</th>
+                    <th className="hidden md:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Cliente</th>
+                    <th className="px-4 sm:px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total</th>
+                    <th className="px-4 sm:px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -212,20 +212,20 @@ export default function Dashboard() {
                       key={inv.id}
                       className="cursor-pointer transition-colors hover:bg-gray-50/50"
                     >
-                      <td className="px-6 py-2.5 text-sm">
+                      <td className="px-4 sm:px-6 py-2.5 text-sm">
                         <Link to={`/facturas/${inv.id}`} className="font-medium text-indigo-600 hover:text-indigo-700">
                           {formatCbteTipo(inv.cbteTipo)}
                         </Link>
                       </td>
-                      <td className="px-6 py-2.5 font-mono text-xs text-gray-500">
+                      <td className="hidden sm:table-cell px-6 py-2.5 font-mono text-xs text-gray-500">
                         {formatFullInvoiceNumber(inv.puntoVenta, inv.cbteNro)}
                       </td>
-                      <td className="px-6 py-2.5 text-sm text-gray-500">{formatDate(inv.cbteFch)}</td>
-                      <td className="px-6 py-2.5 text-sm text-gray-600">{inv.client?.name || inv.docNro}</td>
-                      <td className="px-6 py-2.5 text-right text-sm font-semibold text-gray-900">
+                      <td className="hidden sm:table-cell px-6 py-2.5 text-sm text-gray-500">{formatDate(inv.cbteFch)}</td>
+                      <td className="hidden md:table-cell px-6 py-2.5 text-sm text-gray-600">{inv.client?.name || inv.docNro}</td>
+                      <td className="px-4 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">
                         {formatCurrency(inv.impTotal)}
                       </td>
-                      <td className="px-6 py-2.5 text-right">
+                      <td className="px-4 sm:px-6 py-2.5 text-right">
                         <InvoiceStatusBadge resultado={inv.resultado} />
                       </td>
                     </tr>

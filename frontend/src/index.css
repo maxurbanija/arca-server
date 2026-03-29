@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -85,6 +90,14 @@
 
 @utility skip-link {
   @apply absolute -top-10 left-4 z-100 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-all focus:top-4;
+}
+
+/* Mobile: minimum touch target */
+@media (pointer: coarse) {
+  button, a, select, input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* Accessibility — focus visible */

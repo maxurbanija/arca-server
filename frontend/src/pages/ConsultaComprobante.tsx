@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MagnifyingGlassIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { consultarComprobante, getPuntosVenta } from '../api/client';
+import { getApiErrorMessage } from '../utils/errors';
 import { CBTE_TIPOS } from '../types';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
@@ -36,8 +37,8 @@ export default function ConsultaComprobante() {
       setResult(null);
       const data = await consultarComprobante(puntoVenta, cbteTipo, nro);
       setResult(data);
-    } catch {
-      toast.error('No se encontró el comprobante en AFIP');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'No se encontró el comprobante en AFIP'), { duration: 8000 });
     } finally {
       setLoading(false);
     }

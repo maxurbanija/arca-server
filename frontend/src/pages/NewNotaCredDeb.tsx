@@ -16,6 +16,7 @@ import {
   formatFullInvoiceNumber,
   formatDate,
 } from '../utils/formatters';
+import { getApiErrorMessage } from '../utils/errors';
 
 // Mapeo de factura -> NC
 const NC_MAP: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
@@ -158,10 +159,7 @@ export default function NewNotaCredDeb() {
         puntoVenta: inv.puntoVenta,
       });
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'Error al emitir el comprobante';
-      toast.error(message);
+      toast.error(getApiErrorMessage(err, 'Error al emitir el comprobante'), { duration: 8000 });
     } finally {
       setSubmitting(false);
     }

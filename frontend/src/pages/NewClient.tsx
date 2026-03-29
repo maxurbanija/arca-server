@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { MagnifyingGlassIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { createClient, getClient, updateClient, consultarCuit } from '../api/client';
+import { getApiErrorMessage } from '../utils/errors';
 
 interface ClientFormData {
   name: string;
@@ -108,8 +109,8 @@ export default function NewClient() {
 
       setCuitFound(true);
       toast.success(`Datos cargados: ${contribuyente.nombre}`);
-    } catch {
-      toast.error('No se encontró el CUIT en el padrón de AFIP');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'No se encontró el CUIT en el padrón de AFIP'), { duration: 8000 });
     } finally {
       setLookingUp(false);
     }
@@ -133,10 +134,7 @@ export default function NewClient() {
       }
       navigate('/clientes');
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'Error al guardar el cliente';
-      toast.error(message);
+      toast.error(getApiErrorMessage(err, 'Error al guardar el cliente'));
     } finally {
       setLoading(false);
     }

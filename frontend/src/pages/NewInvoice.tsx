@@ -15,6 +15,7 @@ import {
   type Client,
 } from '../types';
 import { formatCurrency, todayAsInputDate, inputDateToYYYYMMDD } from '../utils/formatters';
+import { getApiErrorMessage } from '../utils/errors';
 
 interface FormItem {
   description: string;
@@ -231,11 +232,7 @@ export default function NewInvoice() {
         puntoVenta: inv.puntoVenta,
       });
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al emitir la factura';
-      toast.error(message);
+      toast.error(getApiErrorMessage(err, 'Error al emitir la factura'), { duration: 8000 });
     } finally {
       setSubmitting(false);
     }

@@ -201,4 +201,19 @@ export async function generateCert(data: { cuit: string; password: string; alias
   return result;
 }
 
+export async function renewCert(data: { cuit: string; password: string; alias: string; environment?: string }) {
+  const { data: result } = await api.post('/afip/renew-cert', data, { timeout: 120000 });
+  return result;
+}
+
+export async function getCertInfo() {
+  const { data } = await api.get('/afip/cert-info');
+  return data;
+}
+
+export async function testCert(environment?: string) {
+  const { data } = await api.post('/afip/test-cert', { environment }, { timeout: 60000 });
+  return data;
+}
+
 export default api;

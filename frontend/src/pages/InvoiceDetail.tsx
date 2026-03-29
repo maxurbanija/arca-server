@@ -63,24 +63,24 @@ export default function InvoiceDetail() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Actions */}
-      <div className="no-print flex items-center justify-between">
-        <button onClick={() => navigate('/facturas')} className="btn-secondary">
-          <ArrowLeftIcon className="mr-2 h-4 w-4" />
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        <button onClick={() => navigate('/facturas')} className="btn-secondary text-xs sm:text-sm">
+          <ArrowLeftIcon className="h-4 w-4" />
           Volver
         </button>
         <div className="flex gap-2">
           {[1, 6, 11].includes(invoice.cbteTipo) && invoice.cae && (
             <Link
               to={`/facturas/nota?facturaId=${invoice.id}`}
-              className="btn-secondary"
+              className="btn-secondary text-xs sm:text-sm"
             >
-              <ReceiptRefundIcon className="mr-2 h-4 w-4" />
-              NC / ND
+              <ReceiptRefundIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">NC / ND</span>
             </Link>
           )}
-          <button onClick={() => window.print()} className="btn-secondary">
-            <PrinterIcon className="mr-2 h-4 w-4" />
-            Imprimir
+          <button onClick={() => window.print()} className="btn-secondary text-xs sm:text-sm">
+            <PrinterIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Imprimir</span>
           </button>
         </div>
       </div>

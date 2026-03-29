@@ -78,8 +78,7 @@ export default function ClientList() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por nombre o documento..."
-              className="input pl-9"
-              style={{ minWidth: '280px' }}
+              className="input pl-9 w-full sm:w-72"
             />
           </div>
         </form>

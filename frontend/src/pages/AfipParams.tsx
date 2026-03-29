@@ -10,6 +10,7 @@ import {
 } from '../api/client';
 import toast from 'react-hot-toast';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { getApiErrorMessage } from '../utils/errors';
 
 interface ParamItem {
   Id: number | string;
@@ -77,8 +78,8 @@ export default function AfipParams() {
           break;
       }
       setData((prev) => ({ ...prev, [tab]: Array.isArray(result) ? result : [] }));
-    } catch {
-      toast.error('Error cargando datos de AFIP');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Error cargando datos de AFIP'), { duration: 8000 });
     } finally {
       setLoading((prev) => ({ ...prev, [tab]: false }));
     }
@@ -94,8 +95,8 @@ export default function AfipParams() {
       setCotizLoading(true);
       const result = await getCotizacion(monedaId);
       setCotizacion(result);
-    } catch {
-      toast.error('Error obteniendo cotización');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Error obteniendo cotización'), { duration: 8000 });
     } finally {
       setCotizLoading(false);
     }
