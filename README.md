@@ -18,58 +18,69 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 - Notas de crédito y débito asociadas a facturas existentes
 - Cálculo automático de IVA, totales, y numeración (via SDK)
 - QR oficial de AFIP generado y persistido por factura
-- Fechas de servicio condicionales según concepto
+- Fechas de servicio condicionales según concepto (solo para Servicios y Productos y Servicios)
 - Puntos de venta dinámicos cargados desde AFIP
+- Resultado de comprobante: Aprobado (A) / Rechazado (R)
+- Filtros por tipo de comprobante, cliente, y rango de fechas
+- Paginación con 20 registros por página
 
 ### Certificados
 
 - Generación automática de certificados AFIP desde la UI (via arca-cert)
 - Renovación de certificados con alias temporal
 - Verificación de certificado contra WSAA
-- Visualización de expiración y días restantes
+- Visualización de expiración y días restantes (alerta si quedan menos de 30 días)
 - Hot-reload del SDK al generar/renovar (sin reiniciar server)
-- Producción como entorno default
+- Producción como entorno default para generación de certificados
 
 ### Clientes
 
-- CRUD de clientes con búsqueda
-- Auto-completar datos desde CUIT via padrón AFIP (A13)
-- Inferencia de condición IVA desde impuestos del padrón
+- CRUD de clientes con búsqueda (por nombre o número de documento)
+- Auto-completar datos desde CUIT via padrón AFIP (A13): nombre, domicilio, condición IVA
+- Protección contra eliminación: no se puede borrar un cliente que tiene facturas asociadas
 
 ### AFIP
 
-- Consulta de comprobantes en AFIP
+- Consulta de comprobantes en AFIP por punto de venta, tipo y número
 - Parámetros de referencia con tabs (comprobantes, IVA, documentos, monedas, tributos, conceptos)
 - Cotización oficial de monedas
-- Estado de servidores AFIP en dashboard
+- Estado de servidores AFIP en dashboard y en configuración
+
+### Observabilidad
+
+- Logging de eventos del SDK: auth login/cache-hit, request start/end/retry/error
+- Tiempos de respuesta de cada request a AFIP
+- Retries automáticos con backoff exponencial
 
 ### Seguridad
 
-- Helmet con CSP, HSTS, referrer-policy, frame-ancestors
-- API keys hasheadas con SHA-256 (solo se muestran una vez al crearlas)
+- Helmet con CSP, HSTS (1 año), referrer-policy, frame-ancestors: none
+- API keys hasheadas con SHA-256 (solo se muestran una vez al crearlas, máximo 5 por usuario)
 - JWT con secreto obligatorio (sin defaults inseguros)
-- Rate limiting global (200 req/15min) y auth (20 req/15min)
-- CORS restrictivo (default: localhost)
+- DATABASE_URL obligatorio (sin defaults inseguros)
+- Rate limiting: 200 req/15min global, 20 req/15min para endpoints de auth
+- CORS restrictivo (default: `http://localhost:5173`)
 - Body limit 1MB
-- Manejo de errores del SDK con SOAP fault parsing (arca-sdk + arca-cert)
-- Errores de AFIP parseados con hints contextuales (ej: "Estás usando el ambiente correcto?")
+- Manejo de errores del SDK con SOAP fault parsing y hints contextuales
+- Errores de AFIP parseados con mensajes legibles (ej: "Estás usando el ambiente correcto?")
 
 ### Accesibilidad
 
 - Skip-to-content link
-- Focus visible global
+- Focus visible global con outline indigo
 - Respeto de prefers-reduced-motion
 - ARIA labels y roles semánticos
-- Touch targets de 44px en mobile
+- Touch targets de 44px en mobile (pointer: coarse)
 - Touch manipulation (sin 300ms delay)
 
 ### Mobile
 
 - UI responsive con Tailwind breakpoints
-- Tablas con columnas ocultas en pantallas chicas
-- Botones compactos (icono solo en mobile)
+- Tablas con columnas ocultas en pantallas chicas (Número, Fecha, Cliente)
+- Botones compactos (icono solo en mobile, texto en desktop)
 - Stat cards en 2 columnas en mobile
 - Pagination compacta y centrada
+- Toasts dismissibles con botón de cerrar
 
 ## Setup
 
@@ -99,6 +110,8 @@ PORT=3001
 CORS_ORIGIN=http://localhost:5173
 ```
 
+> `JWT_SECRET` y `DATABASE_URL` son obligatorios. El server no arranca sin ellos.
+
 ### Instalación
 
 ```bash
@@ -116,7 +129,9 @@ npm run dev
 
 ### Generar certificado AFIP
 
-Se puede generar directamente desde la UI en **Configuración** > **Generar Certificado**, o via API:
+Desde la UI: **Configuración** > **Generar Certificado** (necesitás CUIT + clave fiscal nivel 3+).
+
+Via API:
 
 ```bash
 curl -X POST http://localhost:3001/api/afip/generate-cert \
@@ -124,6 +139,8 @@ curl -X POST http://localhost:3001/api/afip/generate-cert \
   -H "Authorization: Bearer <token>" \
   -d '{"cuit":"20XXXXXXXXX","password":"clave-fiscal","alias":"mi-sistema","environment":"production"}'
 ```
+
+El certificado se guarda en `backend/certs/` y el SDK se recarga automáticamente.
 
 ### Docker
 
@@ -133,48 +150,54 @@ docker compose up -d
 
 ## API Endpoints
 
+### Health
+
+| Método | Ruta | Descripción |
+| ------ | ---- | ----------- |
+| GET | `/api/health` | Health check (público, sin auth) |
+
 ### Autenticación
 
 | Método | Ruta | Descripción |
-|--------|------|-------------|
+| ------ | ---- | ----------- |
 | POST | `/api/auth/register` | Registro (primer usuario = admin) |
 | POST | `/api/auth/login` | Login, retorna JWT |
 | GET | `/api/auth/me` | Usuario autenticado |
-| GET | `/api/auth/api-keys` | Listar API keys |
-| POST | `/api/auth/api-keys` | Crear API key |
+| GET | `/api/auth/api-keys` | Listar API keys (máscara, no el key real) |
+| POST | `/api/auth/api-keys` | Crear API key (se muestra una sola vez) |
 | DELETE | `/api/auth/api-keys/:id` | Eliminar API key |
 
 ### Facturas
 
 | Método | Ruta | Descripción |
-|--------|------|-------------|
+| ------ | ---- | ----------- |
 | POST | `/api/invoices` | Crear factura (A/B/C) |
 | POST | `/api/invoices/nota-credito` | Crear nota de crédito |
 | POST | `/api/invoices/nota-debito` | Crear nota de débito |
-| GET | `/api/invoices` | Listar con filtros y paginación |
+| GET | `/api/invoices` | Listar (filtros: cbteTipo, clientId, from, to) |
 | GET | `/api/invoices/stats` | Estadísticas del dashboard |
-| GET | `/api/invoices/:id` | Detalle de factura |
+| GET | `/api/invoices/:id` | Detalle de factura con items y QR |
 
 ### Clientes
 
 | Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/clients` | Listar clientes |
+| ------ | ---- | ----------- |
+| GET | `/api/clients` | Listar (filtro: search por nombre o documento) |
 | POST | `/api/clients` | Crear cliente |
-| GET | `/api/clients/:id` | Detalle de cliente |
+| GET | `/api/clients/:id` | Detalle con cantidad de facturas |
 | PUT | `/api/clients/:id` | Actualizar cliente |
-| DELETE | `/api/clients/:id` | Eliminar cliente |
+| DELETE | `/api/clients/:id` | Eliminar (falla si tiene facturas) |
 
-### AFIP
+### AFIP — Parámetros y consultas
 
 | Método | Ruta | Descripción |
-|--------|------|-------------|
+| ------ | ---- | ----------- |
 | GET | `/api/afip/status` | Estado servidores WSFE |
 | GET | `/api/afip/contribuyente/:cuit` | Consulta padrón A13 |
-| GET | `/api/afip/comprobante` | Consultar comprobante en AFIP |
-| GET | `/api/afip/cotizacion` | Cotización de moneda |
+| GET | `/api/afip/comprobante` | Consultar comprobante (query: puntoVenta, cbteTipo, cbteNro) |
+| GET | `/api/afip/cotizacion` | Cotización de moneda (query: monedaId) |
 | GET | `/api/afip/puntos-venta` | Puntos de venta habilitados |
-| GET | `/api/afip/last-voucher` | Último comprobante autorizado |
+| GET | `/api/afip/last-voucher` | Último comprobante (query: puntoVenta, cbteTipo) |
 | GET | `/api/afip/invoice-types` | Tipos de comprobante |
 | GET | `/api/afip/doc-types` | Tipos de documento |
 | GET | `/api/afip/iva-types` | Alícuotas IVA |
@@ -183,31 +206,53 @@ docker compose up -d
 | GET | `/api/afip/tributo-types` | Tipos de tributo |
 | GET | `/api/afip/optional-types` | Datos opcionales |
 
-### Certificados
+### AFIP — Certificados
 
 | Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/api/afip/generate-cert` | Generar certificado AFIP |
-| POST | `/api/afip/renew-cert` | Renovar certificado |
-| GET | `/api/afip/cert-info` | Info de expiración del cert actual |
+| ------ | ---- | ----------- |
+| POST | `/api/afip/generate-cert` | Generar certificado AFIP (timeout: 2min) |
+| POST | `/api/afip/renew-cert` | Renovar certificado (alias nuevo) |
+| GET | `/api/afip/cert-info` | Expiración del cert actual (días restantes) |
 | POST | `/api/afip/test-cert` | Verificar cert contra WSAA |
 
-## Frontend — Páginas
+## Frontend
 
-| Ruta | Página |
-|------|--------|
-| `/` | Dashboard con stats, facturas recientes, estado AFIP |
-| `/facturas` | Lista de facturas con filtros y paginación |
-| `/facturas/nueva` | Crear factura (tipo-aware: A/B/C) |
-| `/facturas/nota` | Crear nota de crédito / débito |
-| `/facturas/:id` | Detalle de factura con QR |
-| `/clientes` | Lista de clientes con búsqueda |
-| `/clientes/nuevo` | Crear cliente (con lookup CUIT) |
-| `/clientes/:id/editar` | Editar cliente |
-| `/consulta` | Consultar comprobante en AFIP |
-| `/parametros` | Parámetros AFIP (tabs) + cotización |
-| `/configuracion` | Certificados, estado AFIP, info del sistema |
-| `/api-keys` | Gestión de API keys |
+### Páginas
+
+| Ruta | Página | Descripción |
+| ---- | ------ | ----------- |
+| `/` | Dashboard | Stats, facturas recientes, estado AFIP |
+| `/facturas` | Facturas | Lista con filtros por tipo y fecha, paginación |
+| `/facturas/nueva` | Nueva Factura | Formulario tipo-aware (A/B/C) con cálculo en vivo |
+| `/facturas/nota` | NC / ND | Crear nota de crédito o débito desde factura existente |
+| `/facturas/:id` | Detalle | Factura completa con items, totales, CAE, QR, botón NC/ND |
+| `/clientes` | Clientes | Lista con búsqueda y paginación |
+| `/clientes/nuevo` | Nuevo Cliente | Formulario con lookup CUIT desde padrón AFIP |
+| `/clientes/:id/editar` | Editar Cliente | Mismo formulario en modo edición |
+| `/consulta` | Consultar Cbte. | Buscar comprobante en AFIP por PV + tipo + número |
+| `/parametros` | Parámetros AFIP | Tabs: comprobantes, documentos, IVA, conceptos, monedas, tributos + cotización |
+| `/configuracion` | Configuración | Generar/renovar cert, verificar cert, estado AFIP, info sistema |
+| `/api-keys` | API Keys | Crear, listar y eliminar API keys |
+| `/login` | Login | Email + contraseña |
+| `/register` | Registro | Nombre, email, contraseña |
+
+### Navegación (Sidebar)
+
+- **General:** Dashboard
+- **Facturación:** Facturas, Nueva Factura, NC / ND
+- **Gestión:** Clientes, Nuevo Cliente
+- **AFIP:** Consultar Cbte., Parámetros
+- **Sistema:** API Keys, Configuración
+
+## Base de datos
+
+### Modelos (Prisma)
+
+- **User** — email, password (bcrypt 12 rounds), name, role (admin/user)
+- **ApiKey** — key (SHA-256 hash), keyHint (máscara visible), userId, lastUsed (máx 5 por usuario)
+- **Client** — name, docType, docNumber, ivaCondition, address, email, phone
+- **Invoice** — cbteTipo, puntoVenta, cbteNro, importes (Decimal 15,2), cae, caeFchVto, resultado, qrUrl, monId, monCotiz, observations
+- **InvoiceItem** — description, quantity, unitPrice, ivaId, ivaRate, subtotal, ivaAmount
 
 ## Tests
 
@@ -216,6 +261,8 @@ cd backend
 npm test                           # 48 tests unitarios
 AFIP_CUIT=20XXXXX npm test         # + tests de integración con AFIP
 ```
+
+Tests cubren: constantes/enums, formatDate, calcularTotales (IVA, exentos, no gravados, tipo C, tributos), extractCAE, generateQRUrl, error classes (ArcaError, ArcaAuthError, ArcaWSFEError, ArcaSoapError), y tests de integración con AFIP homologación (se auto-skipean sin certs).
 
 ## Licencia
 
