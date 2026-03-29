@@ -4,14 +4,15 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 
 ## Stack
 
-- **Backend:** Node.js, Express 5, TypeScript, Prisma 7, PostgreSQL
-- **Frontend:** React 19, Vite, Tailwind CSS, React Hook Form
-- **SDK:** [@ramiidv/arca-sdk](https://github.com/ramiidv/arca-sdk) — SDK propio para WSFE, WSFEX, WSAA, Padrón
+- **Backend:** Node.js 22+, Express 5.2, TypeScript 6, Prisma 7 (driver adapter), PostgreSQL, Zod 4
+- **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite), React Hook Form 7
+- **SDK:** [@ramiidv/arca-sdk](https://github.com/ramiidv/arca-sdk) v1.1+ — SDK propio para WSFE, WSFEX, WSAA, Padrón
 - **Infra:** Docker Compose, Nginx
 
 ## Features
 
 ### Facturación
+
 - Factura A, B, C con validación por tipo (A requiere CUIT, C no discrimina IVA)
 - Notas de crédito y débito asociadas a facturas existentes
 - Cálculo automático de IVA, totales, y numeración (via SDK)
@@ -19,11 +20,13 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 - Fechas de servicio condicionales según concepto
 
 ### Clientes
+
 - CRUD de clientes con búsqueda
 - Auto-completar datos desde CUIT via padrón AFIP (A13)
 - Inferencia de condición IVA desde impuestos del padrón
 
 ### AFIP
+
 - Consulta de comprobantes en AFIP
 - Parámetros de referencia (tipos de comprobante, IVA, documentos, monedas, tributos)
 - Cotización oficial de monedas
@@ -31,6 +34,7 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 - Estado de servidores AFIP en dashboard
 
 ### Seguridad
+
 - Helmet con CSP, HSTS, referrer-policy
 - API keys hasheadas con SHA-256 (solo se muestran una vez al crearlas)
 - JWT con secreto obligatorio (sin defaults inseguros)
@@ -39,6 +43,7 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 - Manejo de errores del SDK (ArcaAuthError, ArcaWSFEError, ArcaSoapError)
 
 ### Accesibilidad
+
 - Skip-to-content link
 - Focus visible global
 - Respeto de prefers-reduced-motion
@@ -47,6 +52,7 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 ## Setup
 
 ### Requisitos
+
 - Node.js 22+
 - PostgreSQL 17+
 - Certificado y clave de AFIP (homologación o producción)
@@ -94,13 +100,15 @@ docker compose up -d
 
 ## API Endpoints
 
-### Auth
+### Autenticación
+
 - `POST /api/auth/register` — Registro (primer usuario = admin)
 - `POST /api/auth/login` — Login, retorna JWT
 - `GET /api/auth/me` — Usuario autenticado
 - `GET/POST/DELETE /api/auth/api-keys` — Gestión de API keys
 
 ### Facturas
+
 - `POST /api/invoices` — Crear factura (A/B/C)
 - `POST /api/invoices/nota-credito` — Crear nota de crédito
 - `POST /api/invoices/nota-debito` — Crear nota de débito
@@ -109,10 +117,12 @@ docker compose up -d
 - `GET /api/invoices/:id` — Detalle de factura
 
 ### Clientes
+
 - `GET/POST /api/clients` — Listar/crear clientes
 - `GET/PUT/DELETE /api/clients/:id` — CRUD individual
 
 ### AFIP
+
 - `GET /api/afip/status` — Estado servidores WSFE
 - `GET /api/afip/contribuyente/:cuit` — Consulta padrón A13
 - `GET /api/afip/comprobante` — Consultar comprobante en AFIP

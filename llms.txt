@@ -4,9 +4,9 @@
 ARCA Server is a full-stack Argentine electronic invoicing system (facturación electrónica) that integrates with AFIP/ARCA web services. It allows businesses to issue invoices (Facturas A/B/C), credit notes, debit notes, and query taxpayer data — all through AFIP's official SOAP-based APIs.
 
 ## Architecture
-- **Backend:** Express 5 (TypeScript), Prisma 7 (PostgreSQL), @ramiidv/arca-sdk
-- **Frontend:** React 19, Vite, Tailwind CSS, React Hook Form
-- **SDK:** @ramiidv/arca-sdk handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón)
+- **Backend:** Express 5.2 (TypeScript 6), Prisma 7 (PostgreSQL, driver adapter), Zod 4, @ramiidv/arca-sdk
+- **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite, no postcss.config), React Hook Form 7
+- **SDK:** @ramiidv/arca-sdk v1.1+ handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón)
 
 ## Key Files
 

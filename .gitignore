@@ -1,6 +1,9 @@
 node_modules/
 dist/
 src/generated/
+*.tsbuildinfo
+*.d.ts.map
+vite.config.d.ts
 .env
 *.key
 *.crt
