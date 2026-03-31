@@ -13,6 +13,7 @@ import {
   ArcaAuthError,
   ArcaWSFEError,
   ArcaSoapError,
+  CondicionIva,
   NOTA_CREDITO_MAP,
   NOTA_DEBITO_MAP,
 } from '@ramiidv/arca-sdk';
@@ -61,6 +62,15 @@ describe('arca-sdk: constantes y enums', () => {
     expect(NOTA_CREDITO_MAP[CbteTipo.FACTURA_A]).toBe(CbteTipo.NOTA_CREDITO_A);
     expect(NOTA_CREDITO_MAP[CbteTipo.FACTURA_B]).toBe(CbteTipo.NOTA_CREDITO_B);
     expect(NOTA_CREDITO_MAP[CbteTipo.FACTURA_C]).toBe(CbteTipo.NOTA_CREDITO_C);
+  });
+
+  it('CondicionIva tiene las condiciones principales', () => {
+    expect(CondicionIva.RESPONSABLE_INSCRIPTO).toBe(1);
+    expect(CondicionIva.EXENTO).toBe(4);
+    expect(CondicionIva.CONSUMIDOR_FINAL).toBe(5);
+    expect(CondicionIva.MONOTRIBUTISTA).toBe(6);
+    expect(CondicionIva.CLIENTE_EXTERIOR).toBe(9);
+    expect(CondicionIva.MONOTRIBUTO_SOCIAL).toBe(13);
   });
 
   it('NOTA_DEBITO_MAP mapea facturas a sus ND correspondientes', () => {
@@ -227,10 +237,10 @@ describe('arca-sdk: Arca.calcularTotales()', () => {
     expect(iva).toHaveLength(0);
   });
 
-  it('lanza error si item tiene iva y exento a la vez', () => {
-    expect(() => {
-      Arca.calcularTotales([{ neto: 500, iva: IvaTipo.IVA_21, exento: true }]);
-    }).toThrow();
+  it('item con iva y exento: exento tiene prioridad', () => {
+    const { importes } = Arca.calcularTotales([{ neto: 500, iva: IvaTipo.IVA_21, exento: true }]);
+    expect(importes.exento).toBe(500);
+    expect(importes.iva).toBe(0);
   });
 
   it('lanza error para IvaTipo desconocido', () => {

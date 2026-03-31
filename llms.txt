@@ -6,7 +6,7 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 ## Architecture
 - **Backend:** Express 5.2 (TypeScript 6), Prisma 7 (PostgreSQL, driver adapter @prisma/adapter-pg), Zod 4, @ramiidv/arca-sdk, arca-cert
 - **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite, no postcss.config), React Hook Form 7
-- **SDK:** @ramiidv/arca-sdk v1.1+ handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón, CAEA, QR)
+- **SDK:** @ramiidv/arca-sdk v1.2+ handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón, CAEA, QR). Parameter caching built-in (clearParamCache() to invalidate)
 - **Certificates:** arca-cert handles automated AFIP certificate generation/renewal via portal login
 
 ## Key Files
@@ -19,7 +19,7 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 - `backend/src/lib/prisma.ts` — Single shared Prisma 7 client with PrismaPg driver adapter
 - `backend/src/middleware/auth.ts` — JWT Bearer + API key (SHA-256 hashed, looked up by hash). API keys authenticated via X-API-Key header
 - `backend/src/middleware/errorHandler.ts` — Handles AppError, ArcaAuthError (503), ArcaWSFEError (400 with errors[]), ArcaSoapError (502 with parseSoapFault for clean messages), ArcaCertError (status mapped by code), ArcaError (400), PrismaErrors, ZodError
-- `backend/src/routes/afip.ts` — 19 routes: AFIP params (7), cert management (4), contribuyente, comprobante, cotizacion, puntos-venta, last-voucher, status, tributo-types
+- `backend/src/routes/afip.ts` — 20 routes: AFIP params (8 incl. iva-conditions), cert management (4), contribuyente, comprobante, cotizacion, puntos-venta, last-voucher, status, tributo-types
 - `backend/src/routes/invoices.ts` — POST / (create), POST /nota-credito, POST /nota-debito, GET / (list with filters: cbteTipo, clientId, from, to), GET /stats, GET /:id
 - `backend/src/routes/auth.ts` — register (first user = admin), login (JWT), me, api-keys CRUD (max 5 per user, SHA-256 hashed, keyHint for display)
 - `backend/src/routes/clients.ts` — CRUD with search by name/docNumber, delete protection (fails if client has invoices)
@@ -62,7 +62,8 @@ Key SDK methods used in this project:
 - `arca.consultarCuit(cuit)` — Taxpayer lookup (nombre, tipoPersona, estadoClave, domicilioFiscal, impuestos)
 - `arca.consultarComprobante(tipo, pv, nro)` — Invoice query in AFIP
 - `arca.getPuntosVenta()` — Active sales points
-- `arca.getTiposComprobante/Documento/Iva/Concepto/Monedas/Tributo/Opcional()` — AFIP parameters
+- `arca.getTiposComprobante/Documento/Iva/Concepto/Monedas/Tributo/Opcional()` — AFIP parameters (cached)
+- `arca.getCondicionesIva()` — IVA conditions (RI, Exento, CF, Monotributista, etc.) (cached)
 - `arca.getCotizacion(monedaId)` — Official exchange rates
 - `arca.serverStatus()` / `arca.serverStatusExpo()` — AFIP server health
 - `Arca.generateQRUrl(input)` — Official AFIP QR URL
@@ -111,7 +112,7 @@ The arca-cert package automates AFIP certificate lifecycle:
 
 ## Testing
 - 48 vitest tests covering:
-  - SDK constants and enums (IVA_RATES, CbteTipo, Concepto, DocTipo, Moneda, NOTA_CREDITO_MAP, NOTA_DEBITO_MAP)
+  - SDK constants and enums (IVA_RATES, CbteTipo, Concepto, DocTipo, CondicionIva, Moneda, NOTA_CREDITO_MAP, NOTA_DEBITO_MAP)
   - Arca.formatDate() with timezone handling (accepts Date and string)
   - Arca.generateQRUrl() URL generation and uniqueness
   - Arca.calcularTotales() — IVA 21%, multiple aliquots, grouping, exentos, no gravados, mixed, tipoC, iva+exento validation, unknown IvaTipo, IVA 0%, tributos

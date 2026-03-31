@@ -95,4 +95,11 @@ export const IVA_CONDITIONS: Record<number, string> = {
   4: 'Exento',
   5: 'Consumidor Final',
   6: 'Monotributista',
+  7: 'No Categorizado',
+  8: 'Proveedor del Exterior',
+  9: 'Cliente del Exterior',
+  10: 'IVA Liberado',
+  13: 'Monotributo Social',
+  15: 'IVA No Alcanzado',
+  16: 'Monotributo Independiente Promovido',
 };

@@ -191,6 +191,11 @@ export async function getAfipTributoTypes() {
   return data;
 }
 
+export async function getAfipIvaConditions() {
+  const { data } = await api.get('/afip/iva-conditions');
+  return data;
+}
+
 export async function getAfipOptionalTypes() {
   const { data } = await api.get('/afip/optional-types');
   return data;

@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { createCertificate, renewCertificate, getCertExpiry, authenticate } from 'arca-cert';
 import { arca, reloadArca } from '../services/arca.service';
-import { config } from '../config';
 
 const router = Router();
 
@@ -164,6 +163,16 @@ router.get('/cotizacion', async (req: Request, res: Response, next: NextFunction
 
     const cotizacion = await arca.getCotizacion(monedaId);
     res.json({ success: true, data: cotizacion });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /iva-conditions - IVA conditions (Responsable Inscripto, Monotributista, etc.)
+router.get('/iva-conditions', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const types = await arca.getCondicionesIva();
+    res.json({ success: true, data: types });
   } catch (error) {
     next(error);
   }

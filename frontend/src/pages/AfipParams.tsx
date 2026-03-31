@@ -3,6 +3,7 @@ import {
   getAfipInvoiceTypes,
   getAfipDocTypes,
   getAfipIvaTypes,
+  getAfipIvaConditions,
   getAfipConceptTypes,
   getAfipCurrencyTypes,
   getAfipTributoTypes,
@@ -23,6 +24,7 @@ const TABS = [
   { key: 'comprobantes', label: 'Comprobantes' },
   { key: 'documentos', label: 'Documentos' },
   { key: 'iva', label: 'IVA' },
+  { key: 'condiciones', label: 'Cond. IVA' },
   { key: 'conceptos', label: 'Conceptos' },
   { key: 'monedas', label: 'Monedas' },
   { key: 'tributos', label: 'Tributos' },
@@ -36,6 +38,7 @@ export default function AfipParams() {
     comprobantes: [],
     documentos: [],
     iva: [],
+    condiciones: [],
     conceptos: [],
     monedas: [],
     tributos: [],
@@ -44,6 +47,7 @@ export default function AfipParams() {
     comprobantes: false,
     documentos: false,
     iva: false,
+    condiciones: false,
     conceptos: false,
     monedas: false,
     tributos: false,
@@ -66,6 +70,9 @@ export default function AfipParams() {
           break;
         case 'iva':
           result = await getAfipIvaTypes();
+          break;
+        case 'condiciones':
+          result = await getAfipIvaConditions();
           break;
         case 'conceptos':
           result = await getAfipConceptTypes();

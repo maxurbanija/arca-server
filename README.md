@@ -6,7 +6,7 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 
 - **Backend:** Node.js 22+, Express 5.2, TypeScript 6, Prisma 7 (driver adapter), PostgreSQL, Zod 4
 - **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite), React Hook Form 7
-- **SDK:** [@ramiidv/arca-sdk](https://github.com/ramiidv/arca-sdk) v1.1+ — WSFE, WSFEX, WSAA, Padrón, CAEA, QR
+- **SDK:** [@ramiidv/arca-sdk](https://github.com/ramiidv/arca-sdk) v1.2+ — WSFE, WSFEX, WSAA, Padrón, CAEA, QR (con cache de parámetros)
 - **Certificados:** [arca-cert](https://www.npmjs.com/package/arca-cert) — Generación automática de certificados AFIP
 - **Infra:** Docker Compose, Nginx
 
@@ -201,6 +201,7 @@ docker compose up -d
 | GET | `/api/afip/invoice-types` | Tipos de comprobante |
 | GET | `/api/afip/doc-types` | Tipos de documento |
 | GET | `/api/afip/iva-types` | Alícuotas IVA |
+| GET | `/api/afip/iva-conditions` | Condiciones frente al IVA |
 | GET | `/api/afip/concept-types` | Tipos de concepto |
 | GET | `/api/afip/currency-types` | Monedas |
 | GET | `/api/afip/tributo-types` | Tipos de tributo |
@@ -262,7 +263,7 @@ npm test                           # 48 tests unitarios
 AFIP_CUIT=20XXXXX npm test         # + tests de integración con AFIP
 ```
 
-Tests cubren: constantes/enums, formatDate, calcularTotales (IVA, exentos, no gravados, tipo C, tributos), extractCAE, generateQRUrl, error classes (ArcaError, ArcaAuthError, ArcaWSFEError, ArcaSoapError), y tests de integración con AFIP homologación (se auto-skipean sin certs).
+Tests cubren: constantes/enums (incluido CondicionIva), formatDate, calcularTotales (IVA, exentos, no gravados, tipo C, tributos), extractCAE, generateQRUrl, error classes (ArcaError, ArcaAuthError, ArcaWSFEError, ArcaSoapError), y tests de integración con AFIP homologación (se auto-skipean sin certs).
 
 ## Licencia
 

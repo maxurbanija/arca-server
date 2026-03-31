@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { MagnifyingGlassIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { createClient, getClient, updateClient, consultarCuit } from '../api/client';
+import { IVA_CONDITIONS } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
 
 interface ClientFormData {
@@ -232,10 +233,9 @@ export default function NewClient() {
                 {...register('ivaCondition', { valueAsNumber: true })}
                 className="select"
               >
-                <option value={1}>Responsable Inscripto</option>
-                <option value={4}>Exento</option>
-                <option value={5}>Consumidor Final</option>
-                <option value={6}>Monotributista</option>
+                {Object.entries(IVA_CONDITIONS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </div>
 
