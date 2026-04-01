@@ -6,7 +6,10 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 
 - **Backend:** Node.js 22+, Express 5.2, TypeScript 6, Prisma 7 (driver adapter), PostgreSQL, Zod 4
 - **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite), React Hook Form 7
-- **SDK:** [@ramiidv/arca-sdk](https://github.com/ramiidv/arca-sdk) v1.2+ — WSFE, WSFEX, WSAA, Padrón, CAEA, QR (con cache de parámetros)
+- **Facturación:** [@ramiidv/arca-facturacion](https://www.npmjs.com/package/@ramiidv/arca-facturacion) v2 — WSFE, WSFEX, CAEA, QR
+- **Padrón:** [@ramiidv/arca-padron](https://www.npmjs.com/package/@ramiidv/arca-padron) — A4, A10, A100
+- **Constatación:** [@ramiidv/arca-cdc](https://www.npmjs.com/package/@ramiidv/arca-cdc) — WSCDC
+- **Common:** [@ramiidv/arca-common](https://www.npmjs.com/package/@ramiidv/arca-common) — WSAA, SOAP, validadores
 - **Certificados:** [arca-cert](https://www.npmjs.com/package/arca-cert) — Generación automática de certificados AFIP
 - **Infra:** Docker Compose, Nginx
 
@@ -188,7 +191,7 @@ docker compose up -d
 | PUT | `/api/clients/:id` | Actualizar cliente |
 | DELETE | `/api/clients/:id` | Eliminar (falla si tiene facturas) |
 
-### AFIP — Parámetros y consultas
+### AFIP — Parámetros, Padrón y Constatación
 
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
@@ -206,6 +209,11 @@ docker compose up -d
 | GET | `/api/afip/currency-types` | Monedas |
 | GET | `/api/afip/tributo-types` | Tipos de tributo |
 | GET | `/api/afip/optional-types` | Datos opcionales |
+| GET | `/api/afip/contribuyente-basic/:cuit` | Consulta padrón A10 (básico) |
+| GET | `/api/afip/padron-status` | Estado servicios de padrón (A4/A10/A100) |
+| POST | `/api/afip/constatar` | Constatar comprobante via WSCDC |
+| GET | `/api/afip/cdc-status` | Estado servicio WSCDC |
+| GET | `/api/afip/cdc-tipos-cbte` | Tipos de comprobante WSCDC |
 
 ### AFIP — Certificados
 

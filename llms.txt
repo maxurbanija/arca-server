@@ -4,9 +4,12 @@
 ARCA Server is a full-stack Argentine electronic invoicing system (facturación electrónica) that integrates with AFIP/ARCA web services. It allows businesses to issue invoices (Facturas A/B/C), credit notes, debit notes, query taxpayer data, and generate AFIP certificates — all through AFIP's official SOAP-based APIs.
 
 ## Architecture
-- **Backend:** Express 5.2 (TypeScript 6), Prisma 7 (PostgreSQL, driver adapter @prisma/adapter-pg), Zod 4, @ramiidv/arca-sdk, arca-cert
+- **Backend:** Express 5.2 (TypeScript 6), Prisma 7 (PostgreSQL, driver adapter @prisma/adapter-pg), Zod 4, arca-cert
 - **Frontend:** React 19.2, Vite 8, Tailwind CSS 4 (@tailwindcss/vite, no postcss.config), React Hook Form 7
-- **SDK:** @ramiidv/arca-sdk v1.2+ handles all AFIP SOAP communication (WSFE, WSFEX, WSAA, Padrón, CAEA, QR). Parameter caching built-in (clearParamCache() to invalidate)
+- **Facturación:** @ramiidv/arca-facturacion v2 — WSFE, WSFEX, CAEA, QR (replaces deprecated @ramiidv/arca-sdk)
+- **Padrón:** @ramiidv/arca-padron — A4 (full), A10 (basic), A100 (parameters)
+- **Constatación:** @ramiidv/arca-cdc — WSCDC verify comprobantes
+- **Common:** @ramiidv/arca-common — shared WSAA, SOAP client, validators
 - **Certificates:** arca-cert handles automated AFIP certificate generation/renewal via portal login
 
 ## Key Files
@@ -14,12 +17,12 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 ### Backend
 - `backend/src/index.ts` — Express app with Helmet (CSP, HSTS, frame-ancestors:none), CORS, rate limiting (200/15min global, 20/15min auth), body limit 1MB
 - `backend/src/config/index.ts` — Environment config. JWT_SECRET and DATABASE_URL are required (no defaults, throws on missing)
-- `backend/src/services/arca.service.ts` — Arca SDK instance via Proxy pattern (allows hot-reload on cert change). Event logging for auth, requests, retries, errors. `reloadArca(production?)` recreates instance without server restart
+- `backend/src/services/arca.service.ts` — Arca (facturacion), ArcaPadron, ArcaCdc instances via Proxy pattern (hot-reload on cert change). Event logging for auth, requests, retries, errors. `reloadArca(production?)` recreates all instances
 - `backend/src/services/invoice.service.ts` — createInvoice (facturar), createNotaCredito, createNotaDebito, QR generation via Arca.generateQRUrl(), shared saveComprobante helper
 - `backend/src/lib/prisma.ts` — Single shared Prisma 7 client with PrismaPg driver adapter
 - `backend/src/middleware/auth.ts` — JWT Bearer + API key (SHA-256 hashed, looked up by hash). API keys authenticated via X-API-Key header
 - `backend/src/middleware/errorHandler.ts` — Handles AppError, ArcaAuthError (503), ArcaWSFEError (400 with errors[]), ArcaSoapError (502 with parseSoapFault for clean messages), ArcaCertError (status mapped by code), ArcaError (400), PrismaErrors, ZodError
-- `backend/src/routes/afip.ts` — 20 routes: AFIP params (8 incl. iva-conditions), cert management (4), contribuyente, comprobante, cotizacion, puntos-venta, last-voucher, status, tributo-types
+- `backend/src/routes/afip.ts` — 26 routes: AFIP params (8), cert management (4), padrón (3: contribuyente A4, contribuyente-basic A10, padron-status), CDC (3: constatar, cdc-status, cdc-tipos-cbte), comprobante, cotizacion, puntos-venta, last-voucher, status, tributo-types
 - `backend/src/routes/invoices.ts` — POST / (create), POST /nota-credito, POST /nota-debito, GET / (list with filters: cbteTipo, clientId, from, to), GET /stats, GET /:id
 - `backend/src/routes/auth.ts` — register (first user = admin), login (JWT), me, api-keys CRUD (max 5 per user, SHA-256 hashed, keyHint for display)
 - `backend/src/routes/clients.ts` — CRUD with search by name/docNumber, delete protection (fails if client has invoices)
@@ -47,19 +50,30 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 - `frontend/src/index.css` — @import "tailwindcss", @utility directives (btn-primary/secondary/danger, card, input, label, select, table-header/cell, stat-card, empty-state, badge-green/red/yellow, skip-link). Touch targets 44px for pointer:coarse, touch-manipulation, prefers-reduced-motion, focus-visible, print styles, custom scrollbar
 - `frontend/src/types/index.ts` — Invoice (with qrUrl), Client, InvoiceItem, InvoiceStats, CBTE_TIPOS, DOC_TIPOS, IVA_ALICUOTAS, IVA_CONDITIONS constants
 
-## AFIP Integration (via @ramiidv/arca-sdk)
+## AFIP Integration (modular packages)
 
-The SDK wraps AFIP's SOAP web services:
+### @ramiidv/arca-facturacion (replaces deprecated @ramiidv/arca-sdk)
 - **WSAA** — Authentication (PKCS#7 signed TRA, token caching with dedup, 2min expiry margin, retry with backoff)
-- **WSFE** — Electronic invoicing (CAE requests, parameter queries, CAEA support)
+- **WSFE** — Electronic invoicing (CAE requests, parameter queries, CAEA support, CondicionIva)
 - **WSFEX** — Export invoicing (facturarExpo, countries, incoterms, currencies)
-- **Padrón A5/A13** — Taxpayer data queries (consultarCuit, consultarCuitDetalle)
 - **QR** — Official AFIP QR URL generation (Arca.generateQRUrl)
 
-Key SDK methods used in this project:
+### @ramiidv/arca-padron
+- **A4** — Full taxpayer data (getPersona) — domicilios, impuestos, actividades, regímenes
+- **A10** — Basic taxpayer data (getPersonaBasic)
+- **A100** — Parameter tables (getParametros) — provincias, tipos documento, etc.
+
+### @ramiidv/arca-cdc
+- **WSCDC** — Constatación de comprobantes (constatar) — verify CAE/CAI/CAEA codes
+
+Key methods used in this project:
 - `arca.facturar(opts)` — Simplified invoice creation (auto-calculates IVA, totals, numbering)
 - `arca.notaCredito(opts)` / `arca.notaDebito(opts)` — NC/ND with type inference from NOTA_CREDITO_MAP/NOTA_DEBITO_MAP
-- `arca.consultarCuit(cuit)` — Taxpayer lookup (nombre, tipoPersona, estadoClave, domicilioFiscal, impuestos)
+- `padron.getPersona(cuit)` — Full taxpayer data (A4: domicilios, impuestos, actividades)
+- `padron.getPersonaBasic(cuit)` — Basic taxpayer data (A10)
+- `padron.status()` — Health check for A4/A10/A100 services
+- `cdc.constatar(input)` — Verify comprobante authorization (CAE/CAI/CAEA)
+- `cdc.status()` — WSCDC health check
 - `arca.consultarComprobante(tipo, pv, nro)` — Invoice query in AFIP
 - `arca.getPuntosVenta()` — Active sales points
 - `arca.getTiposComprobante/Documento/Iva/Concepto/Monedas/Tributo/Opcional()` — AFIP parameters (cached)

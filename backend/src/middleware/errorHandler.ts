@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { ArcaAuthError, ArcaWSFEError, ArcaSoapError, ArcaError } from '@ramiidv/arca-sdk';
+import { ArcaAuthError, ArcaWSFEError, ArcaSoapError, ArcaError } from '@ramiidv/arca-facturacion';
+import { ArcaServiceError } from '@ramiidv/arca-common';
 import { ArcaCertError, parseSoapFault } from 'arca-cert';
 
 export class AppError extends Error {
@@ -87,6 +88,15 @@ export function errorHandler(
       success: false,
       error: 'AFIP service unavailable',
       details: err.message,
+    });
+    return;
+  }
+
+  // arca-common / arca-padron / arca-cdc errors
+  if (err instanceof ArcaServiceError) {
+    res.status(400).json({
+      success: false,
+      error: err.message,
     });
     return;
   }

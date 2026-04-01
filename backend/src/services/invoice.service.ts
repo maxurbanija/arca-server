@@ -1,6 +1,6 @@
 import { Prisma } from '../generated/prisma/client';
-import { Arca, IVA_RATES, Concepto } from '@ramiidv/arca-sdk';
-import type { FacturarOpts, LineItem, FacturaResult } from '@ramiidv/arca-sdk';
+import { Arca, IVA_RATES, Concepto } from '@ramiidv/arca-facturacion';
+import type { FacturarOpts, LineItem, FacturaResult } from '@ramiidv/arca-facturacion';
 import { prisma } from '../lib/prisma';
 import { arca } from './arca.service';
 import { config } from '../config';

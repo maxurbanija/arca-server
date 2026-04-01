@@ -83,33 +83,38 @@ export default function NewClient() {
     try {
       setLookingUp(true);
       setCuitFound(false);
-      const contribuyente = await consultarCuit(Number(cuit));
+      const persona = await consultarCuit(cuit);
 
-      setValue('name', contribuyente.nombre);
+      // Handle both old SDK format and new arca-padron format
+      const nombre = persona.nombre || persona.razonSocial ||
+        [persona.apellido, persona.nombre].filter(Boolean).join(' ') || '';
+      if (nombre) setValue('name', nombre);
 
-      if (contribuyente.domicilioFiscal?.direccion) {
+      // Address from domicilios array (new) or domicilioFiscal (old)
+      const domicilio = persona.domicilios?.[0] || persona.domicilioFiscal;
+      if (domicilio) {
         const parts = [
-          contribuyente.domicilioFiscal.direccion,
-          contribuyente.domicilioFiscal.localidad,
-          contribuyente.domicilioFiscal.codPostal,
+          domicilio.direccion || domicilio.calle,
+          domicilio.localidad,
+          domicilio.codPostal || domicilio.codigoPostal,
+          domicilio.provincia || domicilio.descripcionProvincia,
         ].filter(Boolean);
-        setValue('address', parts.join(', '));
+        if (parts.length > 0) setValue('address', parts.join(', '));
       }
 
-      // Inferir condición IVA de los impuestos
-      if (contribuyente.impuestos) {
-        const impIds = contribuyente.impuestos.map((i) => i.id);
-        if (impIds.includes(32)) {
-          setValue('ivaCondition', 1); // Responsable Inscripto
-        } else if (impIds.includes(20)) {
-          setValue('ivaCondition', 6); // Monotributista
-        } else if (impIds.includes(34)) {
-          setValue('ivaCondition', 4); // Exento
-        }
+      // Infer IVA condition from impuestos
+      const impuestos = persona.impuestos || [];
+      const impIds = impuestos.map((i: { id?: number; idImpuesto?: number }) => i.id || i.idImpuesto);
+      if (impIds.includes(32)) {
+        setValue('ivaCondition', 1); // Responsable Inscripto
+      } else if (impIds.includes(20)) {
+        setValue('ivaCondition', 6); // Monotributista
+      } else if (impIds.includes(34)) {
+        setValue('ivaCondition', 4); // Exento
       }
 
       setCuitFound(true);
-      toast.success(`Datos cargados: ${contribuyente.nombre}`);
+      toast.success(`Datos cargados: ${nombre}`);
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'No se encontró el CUIT en el padrón de AFIP'), { duration: 8000 });
     } finally {

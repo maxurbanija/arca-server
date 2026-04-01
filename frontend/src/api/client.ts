@@ -137,15 +137,8 @@ export async function getPuntosVenta() {
   return data;
 }
 
-export async function consultarCuit(cuit: number) {
-  const { data } = await api.get<{
-    cuit: number;
-    nombre: string;
-    tipoPersona: string;
-    estadoClave: string;
-    domicilioFiscal?: { direccion?: string; localidad?: string; codPostal?: string };
-    impuestos?: { id: number; descripcion: string; estado: string }[];
-  }>(`/afip/contribuyente/${cuit}`);
+export async function consultarCuit(cuit: number | string) {
+  const { data } = await api.get<Record<string, any>>(`/afip/contribuyente/${cuit}`);
   return data;
 }
 
@@ -193,6 +186,31 @@ export async function getAfipTributoTypes() {
 
 export async function getAfipIvaConditions() {
   const { data } = await api.get('/afip/iva-conditions');
+  return data;
+}
+
+export async function consultarCuitBasic(cuit: number | string) {
+  const { data } = await api.get(`/afip/contribuyente-basic/${cuit}`);
+  return data;
+}
+
+export async function getPadronStatus() {
+  const { data } = await api.get('/afip/padron-status');
+  return data;
+}
+
+export async function constatarComprobante(input: Record<string, unknown>) {
+  const { data } = await api.post('/afip/constatar', input, { timeout: 60000 });
+  return data;
+}
+
+export async function getCdcStatus() {
+  const { data } = await api.get('/afip/cdc-status');
+  return data;
+}
+
+export async function getCdcTiposCbte() {
+  const { data } = await api.get('/afip/cdc-tipos-cbte');
   return data;
 }
 

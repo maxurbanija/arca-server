@@ -17,7 +17,10 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
-    "@ramiidv/arca-sdk": "^1.2.4",
+    "@ramiidv/arca-cdc": "^0.1.0",
+    "@ramiidv/arca-common": "^0.1.0",
+    "@ramiidv/arca-facturacion": "^2.0.0",
+    "@ramiidv/arca-padron": "^0.1.0",
     "arca-cert": "^0.1.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",

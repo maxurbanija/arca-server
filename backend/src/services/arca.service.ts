@@ -1,6 +1,8 @@
 import fs from 'fs';
-import { Arca } from '@ramiidv/arca-sdk';
-import type { ArcaEvent } from '@ramiidv/arca-sdk';
+import { Arca } from '@ramiidv/arca-facturacion';
+import type { ArcaEvent } from '@ramiidv/arca-facturacion';
+import { ArcaPadron } from '@ramiidv/arca-padron';
+import { ArcaCdc } from '@ramiidv/arca-cdc';
 import { config } from '../config';
 
 function onEvent(event: ArcaEvent) {
@@ -15,7 +17,7 @@ function onEvent(event: ArcaEvent) {
       console.log(`[ARCA] ${event.method} completed (${event.durationMs}ms)`);
       break;
     case 'request:retry':
-      console.warn(`[ARCA] Retry #${event.attempt} for ${event.method}: ${event.error} (waiting ${event.delayMs}ms)`);
+      console.warn(`[ARCA] Retry #${event.attempt} for ${event.method}: ${event.error}`);
       break;
     case 'request:error':
       console.error(`[ARCA] Error in ${event.method}: ${event.error}`);
@@ -23,10 +25,15 @@ function onEvent(event: ArcaEvent) {
   }
 }
 
-function createArca(production?: boolean): Arca {
-  const cert = fs.readFileSync(config.afip.certPath, 'utf8');
-  const key = fs.readFileSync(config.afip.keyPath, 'utf8');
+function readCerts() {
+  return {
+    cert: fs.readFileSync(config.afip.certPath, 'utf8'),
+    key: fs.readFileSync(config.afip.keyPath, 'utf8'),
+  };
+}
 
+function createArca(production?: boolean): Arca {
+  const { cert, key } = readCerts();
   return new Arca({
     cuit: Number(config.afip.cuit),
     cert,
@@ -36,20 +43,46 @@ function createArca(production?: boolean): Arca {
   });
 }
 
-let _instance = createArca();
-
-export function getArca(): Arca {
-  return _instance;
+function createPadron(production?: boolean): ArcaPadron {
+  const { cert, key } = readCerts();
+  return new ArcaPadron({
+    cuit: config.afip.cuit,
+    cert,
+    key,
+    production: production ?? config.afip.production,
+  });
 }
 
+function createCdc(production?: boolean): ArcaCdc {
+  const { cert, key } = readCerts();
+  return new ArcaCdc({
+    cuit: Number(config.afip.cuit),
+    cert,
+    key,
+    production: production ?? config.afip.production,
+  });
+}
+
+let _arca = createArca();
+let _padron = createPadron();
+let _cdc = createCdc();
+
 export function reloadArca(production?: boolean) {
-  _instance = createArca(production);
+  _arca = createArca(production);
+  _padron = createPadron(production);
+  _cdc = createCdc(production);
   const env = production ? 'PRODUCTION' : 'HOMOLOGATION';
-  console.log(`[ARCA] SDK reloaded with new certificates (${env})`);
+  console.log(`[ARCA] All services reloaded with new certificates (${env})`);
 }
 
 export const arca = new Proxy({} as Arca, {
-  get(_target, prop) {
-    return (getArca() as any)[prop];
-  },
+  get(_target, prop) { return (_arca as any)[prop]; },
+});
+
+export const padron = new Proxy({} as ArcaPadron, {
+  get(_target, prop) { return (_padron as any)[prop]; },
+});
+
+export const cdc = new Proxy({} as ArcaCdc, {
+  get(_target, prop) { return (_cdc as any)[prop]; },
 });

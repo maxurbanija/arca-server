@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { createCertificate, renewCertificate, getCertExpiry, authenticate } from 'arca-cert';
-import { arca, reloadArca } from '../services/arca.service';
+import { arca, padron, cdc, reloadArca } from '../services/arca.service';
 
 const router = Router();
 
@@ -86,17 +86,73 @@ router.get('/puntos-venta', async (_req: Request, res: Response, next: NextFunct
   }
 });
 
-// GET /contribuyente/:cuit - Taxpayer info from padrón
+// GET /contribuyente/:cuit - Taxpayer info from padrón A4 (full)
 router.get('/contribuyente/:cuit', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cuit = parseInt(req.params.cuit as string, 10);
-    if (isNaN(cuit)) {
-      res.status(400).json({ success: false, error: 'CUIT must be a number' });
+    const cuit = req.params.cuit as string;
+    if (!cuit || cuit.length < 11) {
+      res.status(400).json({ success: false, error: 'CUIT must be 11 digits' });
       return;
     }
 
-    const contribuyente = await arca.consultarCuit(cuit);
-    res.json({ success: true, data: contribuyente });
+    const persona = await padron.getPersona(cuit);
+    res.json({ success: true, data: persona });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /contribuyente-basic/:cuit - Taxpayer basic info from padrón A10
+router.get('/contribuyente-basic/:cuit', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cuit = req.params.cuit as string;
+    if (!cuit || cuit.length < 11) {
+      res.status(400).json({ success: false, error: 'CUIT must be 11 digits' });
+      return;
+    }
+
+    const persona = await padron.getPersonaBasic(cuit);
+    res.json({ success: true, data: persona });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /padron-status - Padrón services health check
+router.get('/padron-status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = await padron.status();
+    res.json({ success: true, data: status });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /constatar - Verify a comprobante via WSCDC
+router.post('/constatar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await cdc.constatar(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /cdc-status - WSCDC health check
+router.get('/cdc-status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = await cdc.status();
+    res.json({ success: true, data: status });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /cdc-tipos-cbte - WSCDC voucher types
+router.get('/cdc-tipos-cbte', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tipos = await cdc.getTiposCbte();
+    res.json({ success: true, data: tipos });
   } catch (error) {
     next(error);
   }

@@ -16,13 +16,13 @@ import {
   CondicionIva,
   NOTA_CREDITO_MAP,
   NOTA_DEBITO_MAP,
-} from '@ramiidv/arca-sdk';
+} from '@ramiidv/arca-facturacion';
 
 // ============================================================
 // Tests unitarios (sin certificados ni conexión a AFIP)
 // ============================================================
 
-describe('arca-sdk: constantes y enums', () => {
+describe('arca-facturacion: constantes y enums', () => {
   it('IVA_RATES mapea todos los IvaTipo a porcentajes correctos', () => {
     expect(IVA_RATES[IvaTipo.IVA_0]).toBe(0);
     expect(IVA_RATES[IvaTipo.IVA_2_5]).toBe(2.5);
@@ -80,7 +80,7 @@ describe('arca-sdk: constantes y enums', () => {
   });
 });
 
-describe('arca-sdk: Arca.formatDate()', () => {
+describe('arca-facturacion: Arca.formatDate()', () => {
   it('formatea Date a YYYYMMDD', () => {
     const date = new Date('2026-06-15T12:00:00-03:00');
     expect(Arca.formatDate(date)).toBe('20260615');
@@ -101,7 +101,7 @@ describe('arca-sdk: Arca.formatDate()', () => {
   });
 });
 
-describe('arca-sdk: Arca.generateQRUrl()', () => {
+describe('arca-facturacion: Arca.generateQRUrl()', () => {
   it('genera URL válida del QR de AFIP', () => {
     const url = Arca.generateQRUrl({
       fecha: '2026-03-28',
@@ -142,7 +142,7 @@ describe('arca-sdk: Arca.generateQRUrl()', () => {
   });
 });
 
-describe('arca-sdk: Arca.calcularTotales()', () => {
+describe('arca-facturacion: Arca.calcularTotales()', () => {
   it('calcula totales para items con IVA 21%', () => {
     const { importes, iva } = Arca.calcularTotales([
       { neto: 1000, iva: IvaTipo.IVA_21 },
@@ -272,7 +272,7 @@ describe('arca-sdk: Arca.calcularTotales()', () => {
   });
 });
 
-describe('arca-sdk: Arca.extractCAE()', () => {
+describe('arca-facturacion: Arca.extractCAE()', () => {
   it('extrae CAE de resultado aprobado', () => {
     const mockResult = {
       FeCabResp: {
@@ -375,7 +375,7 @@ describe('arca-sdk: Arca.extractCAE()', () => {
   });
 });
 
-describe('arca-sdk: error classes', () => {
+describe('arca-facturacion: error classes', () => {
   it('ArcaError es instancia de Error', () => {
     const err = new ArcaError('test');
     expect(err).toBeInstanceOf(Error);
@@ -419,7 +419,7 @@ describe('arca-sdk: error classes', () => {
 // Tests de integración (requieren certificados y conexión a AFIP)
 // ============================================================
 
-describe('arca-sdk: integración con AFIP homologación', () => {
+describe('arca-facturacion: integración con AFIP homologación', () => {
   const certPath = path.resolve(__dirname, '../certs/cert.crt');
   const keyPath = path.resolve(__dirname, '../certs/key.key');
   const cuit = process.env.AFIP_CUIT;
