@@ -3,6 +3,10 @@ import { Arca } from '@ramiidv/arca-facturacion';
 import type { ArcaEvent } from '@ramiidv/arca-facturacion';
 import { ArcaPadron } from '@ramiidv/arca-padron';
 import { ArcaCdc } from '@ramiidv/arca-cdc';
+import { ArcaFecred } from '@ramiidv/arca-fecred';
+import { ArcaMtxca } from '@ramiidv/arca-mtxca';
+import { ArcaSire } from '@ramiidv/arca-sire';
+import { ArcaAgro } from '@ramiidv/arca-agro';
 import { config } from '../config';
 
 function onEvent(event: ArcaEvent) {
@@ -32,57 +36,41 @@ function readCerts() {
   };
 }
 
-function createArca(production?: boolean): Arca {
+const cuit = config.afip.cuit;
+
+function createAll(production?: boolean) {
   const { cert, key } = readCerts();
-  return new Arca({
-    cuit: Number(config.afip.cuit),
-    cert,
-    key,
-    production: production ?? config.afip.production,
-    onEvent,
-  });
+  const prod = production ?? config.afip.production;
+
+  return {
+    arca: new Arca({ cuit: Number(cuit), cert, key, production: prod, onEvent }),
+    padron: new ArcaPadron({ cuit, cert, key, production: prod }),
+    cdc: new ArcaCdc({ cuit: Number(cuit), cert, key, production: prod }),
+    fecred: new ArcaFecred({ cuit, cert, key, production: prod }),
+    mtxca: new ArcaMtxca({ cuit: Number(cuit), cert, key, production: prod }),
+    sire: new ArcaSire({ cuit, cert, key, production: prod }),
+    agro: new ArcaAgro({ cuit: Number(cuit), cert, key, production: prod }),
+  };
 }
 
-function createPadron(production?: boolean): ArcaPadron {
-  const { cert, key } = readCerts();
-  return new ArcaPadron({
-    cuit: config.afip.cuit,
-    cert,
-    key,
-    production: production ?? config.afip.production,
-  });
-}
-
-function createCdc(production?: boolean): ArcaCdc {
-  const { cert, key } = readCerts();
-  return new ArcaCdc({
-    cuit: Number(config.afip.cuit),
-    cert,
-    key,
-    production: production ?? config.afip.production,
-  });
-}
-
-let _arca = createArca();
-let _padron = createPadron();
-let _cdc = createCdc();
+let _instances = createAll();
 
 export function reloadArca(production?: boolean) {
-  _arca = createArca(production);
-  _padron = createPadron(production);
-  _cdc = createCdc(production);
+  _instances = createAll(production);
   const env = production ? 'PRODUCTION' : 'HOMOLOGATION';
   console.log(`[ARCA] All services reloaded with new certificates (${env})`);
 }
 
-export const arca = new Proxy({} as Arca, {
-  get(_target, prop) { return (_arca as any)[prop]; },
-});
+function proxy<T extends object>(getter: () => T): T {
+  return new Proxy({} as T, {
+    get(_target, prop) { return (getter() as any)[prop]; },
+  });
+}
 
-export const padron = new Proxy({} as ArcaPadron, {
-  get(_target, prop) { return (_padron as any)[prop]; },
-});
-
-export const cdc = new Proxy({} as ArcaCdc, {
-  get(_target, prop) { return (_cdc as any)[prop]; },
-});
+export const arca = proxy(() => _instances.arca);
+export const padron = proxy(() => _instances.padron);
+export const cdc = proxy(() => _instances.cdc);
+export const fecred = proxy(() => _instances.fecred);
+export const mtxca = proxy(() => _instances.mtxca);
+export const sire = proxy(() => _instances.sire);
+export const agro = proxy(() => _instances.agro);

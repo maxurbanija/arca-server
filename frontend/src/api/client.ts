@@ -239,4 +239,89 @@ export async function testCert(environment?: string) {
   return data;
 }
 
+// FECRED
+export async function getFecredStatus() {
+  const { data } = await api.get('/afip/fecred-status');
+  return data;
+}
+
+export async function consultarFecredObligado(cuit: string) {
+  const { data } = await api.get(`/afip/fecred-obligado/${cuit}`);
+  return data;
+}
+
+export async function consultarFecredCtasCtes(params: Record<string, unknown>) {
+  const { data } = await api.post('/afip/fecred-ctas-ctes', params);
+  return data;
+}
+
+export async function aceptarFecred(codCtaCte: number) {
+  const { data } = await api.post('/afip/fecred-aceptar', { codCtaCte });
+  return data;
+}
+
+export async function rechazarFecred(codCtaCte: number, codMotivoRechazo: number) {
+  const { data } = await api.post('/afip/fecred-rechazar', { codCtaCte, codMotivoRechazo });
+  return data;
+}
+
+// MTXCA
+export async function getMtxcaStatus() {
+  const { data } = await api.get('/afip/mtxca-status');
+  return data;
+}
+
+export async function autorizarMtxca(request: Record<string, unknown>) {
+  const { data } = await api.post('/afip/mtxca-autorizar', request);
+  return data;
+}
+
+// SIRE
+export async function getSireStatus() {
+  const { data } = await api.get('/afip/sire-status');
+  return data;
+}
+
+export async function registrarRetencion(retencion: Record<string, unknown>) {
+  const { data } = await api.post('/afip/sire-retencion', retencion);
+  return data;
+}
+
+export async function consultarRetenciones(params: Record<string, unknown>) {
+  const { data } = await api.post('/afip/sire-consultar', params);
+  return data;
+}
+
+export async function getSireRegimenes() {
+  const { data } = await api.get('/afip/sire-regimenes');
+  return data;
+}
+
+// AGRO
+export async function getAgroStatus() {
+  const { data } = await api.get('/afip/agro-status');
+  return data;
+}
+
+export async function autorizarCPE(cpe: Record<string, unknown>) {
+  const { data } = await api.post('/afip/agro-cpe-autorizar', cpe);
+  return data;
+}
+
+export async function solicitarCTG(solicitud: Record<string, unknown>) {
+  const { data } = await api.post('/afip/agro-ctg-solicitar', solicitud);
+  return data;
+}
+
+export async function autorizarLiquidacion(liquidacion: Record<string, unknown>) {
+  const { data } = await api.post('/afip/agro-lpg-autorizar', liquidacion);
+  return data;
+}
+
+// EMPLEADOS
+export async function generarF935(params: { cuitEmpleador: string; registros: Record<string, unknown>[] }) {
+  const { data } = await api.post('/afip/empleados-generar', params);
+  return data;
+}
+
 export default api;

@@ -2,7 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { createCertificate, renewCertificate, getCertExpiry, authenticate } from 'arca-cert';
-import { arca, padron, cdc, reloadArca } from '../services/arca.service';
+import { arca, padron, cdc, fecred, mtxca, sire, agro, reloadArca } from '../services/arca.service';
+import { ArcaEmpleados } from '@ramiidv/arca-empleados';
 
 const router = Router();
 
@@ -393,6 +394,196 @@ router.post('/test-cert', async (req: Request, res: Response, next: NextFunction
   } catch (error) {
     next(error);
   }
+});
+
+// ============================================================
+// FECRED — Factura de Crédito Electrónica MiPyME
+// ============================================================
+
+// GET /fecred-status - WSFECRED health check
+router.get('/fecred-status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = await fecred.status();
+    res.json({ success: true, data: status });
+  } catch (error) { next(error); }
+});
+
+// GET /fecred-obligado/:cuit - Check if CUIT is obligated to receive FCE
+router.get('/fecred-obligado/:cuit', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await fecred.consultarMontoObligadoRecepcion(req.params.cuit as string);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// POST /fecred-ctas-ctes - Query FCE current accounts
+router.post('/fecred-ctas-ctes', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await fecred.consultarCtasCtes(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// POST /fecred-aceptar - Accept an FCE
+router.post('/fecred-aceptar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await fecred.aceptarFECred(req.body.codCtaCte);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// POST /fecred-rechazar - Reject an FCE
+router.post('/fecred-rechazar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await fecred.rechazarFECred(req.body.codCtaCte, req.body.codMotivoRechazo);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// ============================================================
+// MTXCA — Facturación con detalle de artículos
+// ============================================================
+
+// GET /mtxca-status - WSMTXCA health check
+router.get('/mtxca-status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = await mtxca.status();
+    res.json({ success: true, data: status });
+  } catch (error) { next(error); }
+});
+
+// POST /mtxca-autorizar - Authorize invoice with item detail
+router.post('/mtxca-autorizar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await mtxca.autorizar(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// GET /mtxca-ultimo-comprobante - Last authorized voucher (MTXCA)
+router.get('/mtxca-ultimo-comprobante', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ptoVta = parseInt(req.query.puntoVenta as string, 10);
+    const cbteTipo = parseInt(req.query.cbteTipo as string, 10);
+    if (isNaN(ptoVta) || isNaN(cbteTipo)) {
+      res.status(400).json({ success: false, error: 'puntoVenta and cbteTipo required' });
+      return;
+    }
+    const cbteNro = await mtxca.ultimoComprobante(ptoVta, cbteTipo);
+    res.json({ success: true, data: { CbteNro: cbteNro } });
+  } catch (error) { next(error); }
+});
+
+// ============================================================
+// SIRE — Retenciones Electrónicas
+// ============================================================
+
+// GET /sire-status - SIRE health check
+router.get('/sire-status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = await sire.status();
+    res.json({ success: true, data: status });
+  } catch (error) { next(error); }
+});
+
+// POST /sire-retencion - Register a retention
+router.post('/sire-retencion', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await sire.registrarRetencion(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// POST /sire-consultar - Query retentions by period
+router.post('/sire-consultar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await sire.consultarRetenciones(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// DELETE /sire-anular/:nroComprobante - Cancel a retention
+router.delete('/sire-anular/:nroComprobante', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await sire.anularRetencion(req.params.nroComprobante as string);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// GET /sire-regimenes - Query applicable regimes
+router.get('/sire-regimenes', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await sire.consultarRegimenes();
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// ============================================================
+// AGRO — Servicios Agropecuarios
+// ============================================================
+
+// GET /agro-status - All agro services health check
+router.get('/agro-status', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = await agro.serverStatus();
+    res.json({ success: true, data: status });
+  } catch (error) { next(error); }
+});
+
+// POST /agro-cpe-autorizar - Authorize Carta de Porte automotor
+router.post('/agro-cpe-autorizar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await agro.cpe.autorizarCPEAutomotor(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// POST /agro-ctg-solicitar - Request initial CTG
+router.post('/agro-ctg-solicitar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await agro.ctg.solicitarCTGInicial(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// POST /agro-lpg-autorizar - Authorize grain settlement
+router.post('/agro-lpg-autorizar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await agro.lpg.liquidacionAutorizar(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+});
+
+// ============================================================
+// EMPLEADOS — Generación de archivos F935
+// ============================================================
+
+// POST /empleados-generar - Generate F935 file
+router.post('/empleados-generar', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { cuitEmpleador, registros } = req.body;
+    if (!cuitEmpleador || !registros) {
+      res.status(400).json({ success: false, error: 'cuitEmpleador and registros required' });
+      return;
+    }
+
+    const builder = new ArcaEmpleados({ cuitEmpleador });
+
+    for (const reg of registros) {
+      switch (reg.tipo) {
+        case 'alta': builder.alta(reg.data); break;
+        case 'baja': builder.baja(reg.data); break;
+        case 'modificacion': builder.modificacion(reg.data); break;
+        case 'datosComplementarios': builder.datosComplementarios(reg.data); break;
+        case 'cbu': builder.cbu(reg.data); break;
+        case 'relacionFamiliar': builder.relacionFamiliar(reg.data); break;
+        case 'domicilio': builder.domicilioExplotacion(reg.data); break;
+      }
+    }
+
+    const output = builder.generar();
+    res.json({ success: true, data: output });
+  } catch (error) { next(error); }
 });
 
 export default router;

@@ -9,6 +9,11 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 - **Facturación:** @ramiidv/arca-facturacion v2 — WSFE, WSFEX, CAEA, QR (replaces deprecated @ramiidv/arca-sdk)
 - **Padrón:** @ramiidv/arca-padron — A4 (full), A10 (basic), A100 (parameters)
 - **Constatación:** @ramiidv/arca-cdc — WSCDC verify comprobantes
+- **FECRED:** @ramiidv/arca-fecred — Factura de Crédito Electrónica MiPyME (WSFECRED)
+- **MTXCA:** @ramiidv/arca-mtxca — Facturación con detalle de artículos (WSMTXCA)
+- **SIRE:** @ramiidv/arca-sire — Retenciones electrónicas
+- **Agro:** @ramiidv/arca-agro — Carta de Porte (WSCPE), CTG (WSCTG), Liquidaciones (WSLPG)
+- **Empleados:** @ramiidv/arca-empleados — Generación F935 (altas, bajas, modificaciones)
 - **Common:** @ramiidv/arca-common — shared WSAA, SOAP client, validators
 - **Certificates:** arca-cert handles automated AFIP certificate generation/renewal via portal login
 
@@ -17,12 +22,12 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 ### Backend
 - `backend/src/index.ts` — Express app with Helmet (CSP, HSTS, frame-ancestors:none), CORS, rate limiting (200/15min global, 20/15min auth), body limit 1MB
 - `backend/src/config/index.ts` — Environment config. JWT_SECRET and DATABASE_URL are required (no defaults, throws on missing)
-- `backend/src/services/arca.service.ts` — Arca (facturacion), ArcaPadron, ArcaCdc instances via Proxy pattern (hot-reload on cert change). Event logging for auth, requests, retries, errors. `reloadArca(production?)` recreates all instances
+- `backend/src/services/arca.service.ts` — All 7 service instances (Arca, ArcaPadron, ArcaCdc, ArcaFecred, ArcaMtxca, ArcaSire, ArcaAgro) via generic Proxy pattern. ArcaEmpleados is stateless (no SOAP). `reloadArca(production?)` recreates all instances. Event logging for auth, requests, retries, errors
 - `backend/src/services/invoice.service.ts` — createInvoice (facturar), createNotaCredito, createNotaDebito, QR generation via Arca.generateQRUrl(), shared saveComprobante helper
 - `backend/src/lib/prisma.ts` — Single shared Prisma 7 client with PrismaPg driver adapter
 - `backend/src/middleware/auth.ts` — JWT Bearer + API key (SHA-256 hashed, looked up by hash). API keys authenticated via X-API-Key header
 - `backend/src/middleware/errorHandler.ts` — Handles AppError, ArcaAuthError (503), ArcaWSFEError (400 with errors[]), ArcaSoapError (502 with parseSoapFault for clean messages), ArcaCertError (status mapped by code), ArcaError (400), PrismaErrors, ZodError
-- `backend/src/routes/afip.ts` — 26 routes: AFIP params (8), cert management (4), padrón (3: contribuyente A4, contribuyente-basic A10, padron-status), CDC (3: constatar, cdc-status, cdc-tipos-cbte), comprobante, cotizacion, puntos-venta, last-voucher, status, tributo-types
+- `backend/src/routes/afip.ts` — 45+ routes: AFIP params (8), cert management (4), padrón (3), CDC (3), FECRED (5), MTXCA (3), SIRE (5), Agro (4), Empleados (1), comprobante, cotizacion, puntos-venta, last-voucher, status
 - `backend/src/routes/invoices.ts` — POST / (create), POST /nota-credito, POST /nota-debito, GET / (list with filters: cbteTipo, clientId, from, to), GET /stats, GET /:id
 - `backend/src/routes/auth.ts` — register (first user = admin), login (JWT), me, api-keys CRUD (max 5 per user, SHA-256 hashed, keyHint for display)
 - `backend/src/routes/clients.ts` — CRUD with search by name/docNumber, delete protection (fails if client has invoices)
@@ -65,6 +70,27 @@ ARCA Server is a full-stack Argentine electronic invoicing system (facturación 
 
 ### @ramiidv/arca-cdc
 - **WSCDC** — Constatación de comprobantes (constatar) — verify CAE/CAI/CAEA codes
+
+### @ramiidv/arca-fecred
+- **WSFECRED** — Factura de Crédito Electrónica MiPyME (Ley 27440)
+- consultarMontoObligadoRecepcion, consultarCtasCtes, consultarComprobantes, aceptarFECred, rechazarFECred, informarFacturaAceptadaCancelada
+
+### @ramiidv/arca-mtxca
+- **WSMTXCA** — Facturación electrónica con detalle de artículos (códigos de barras, cantidades, precios unitarios por línea)
+- autorizar, ultimoComprobante, consultarComprobante, getTiposComprobante, getMonedas, getUnidadesMedida, getPuntosVenta
+
+### @ramiidv/arca-sire
+- **SIRE** — Sistema Integral de Retenciones Electrónicas
+- registrarRetencion, consultarRetenciones, anularRetencion, consultarComprobante, generarCertificado, consultarRegimenes, consultarAlicuotas
+
+### @ramiidv/arca-agro
+- **WSCPE** — Carta de Porte Electrónica (autorizarCPEAutomotor, confirmadoArriboCPE, etc.)
+- **WSCTG** — Código de Trazabilidad de Granos (solicitarCTGInicial, confirmarArribo, etc.)
+- **WSLPG** — Liquidación Primaria de Granos (liquidacionAutorizar, certificacionAutorizar, etc.)
+
+### @ramiidv/arca-empleados
+- **F935** — Generación de archivos F935 para altas, bajas, modificaciones de empleados
+- Builder pattern con method chaining: alta(), baja(), modificacion(), datosComplementarios(), cbu(), relacionFamiliar(), domicilioExplotacion(), generar()
 
 Key methods used in this project:
 - `arca.facturar(opts)` — Simplified invoice creation (auto-calculates IVA, totals, numbering)

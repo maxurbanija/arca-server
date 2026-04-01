@@ -9,6 +9,11 @@ Sistema de facturación electrónica integrado con AFIP/ARCA (Argentina). Backen
 - **Facturación:** [@ramiidv/arca-facturacion](https://www.npmjs.com/package/@ramiidv/arca-facturacion) v2 — WSFE, WSFEX, CAEA, QR
 - **Padrón:** [@ramiidv/arca-padron](https://www.npmjs.com/package/@ramiidv/arca-padron) — A4, A10, A100
 - **Constatación:** [@ramiidv/arca-cdc](https://www.npmjs.com/package/@ramiidv/arca-cdc) — WSCDC
+- **FECRED:** [@ramiidv/arca-fecred](https://www.npmjs.com/package/@ramiidv/arca-fecred) — Factura de Crédito Electrónica MiPyME
+- **MTXCA:** [@ramiidv/arca-mtxca](https://www.npmjs.com/package/@ramiidv/arca-mtxca) — Facturación con detalle de artículos
+- **SIRE:** [@ramiidv/arca-sire](https://www.npmjs.com/package/@ramiidv/arca-sire) — Retenciones electrónicas
+- **Agro:** [@ramiidv/arca-agro](https://www.npmjs.com/package/@ramiidv/arca-agro) — WSCPE, WSCTG, WSLPG
+- **Empleados:** [@ramiidv/arca-empleados](https://www.npmjs.com/package/@ramiidv/arca-empleados) — Generación F935
 - **Common:** [@ramiidv/arca-common](https://www.npmjs.com/package/@ramiidv/arca-common) — WSAA, SOAP, validadores
 - **Certificados:** [arca-cert](https://www.npmjs.com/package/arca-cert) — Generación automática de certificados AFIP
 - **Infra:** Docker Compose, Nginx
@@ -214,6 +219,24 @@ docker compose up -d
 | POST | `/api/afip/constatar` | Constatar comprobante via WSCDC |
 | GET | `/api/afip/cdc-status` | Estado servicio WSCDC |
 | GET | `/api/afip/cdc-tipos-cbte` | Tipos de comprobante WSCDC |
+| GET | `/api/afip/fecred-status` | Estado WSFECRED |
+| GET | `/api/afip/fecred-obligado/:cuit` | Consultar si CUIT está obligado a recibir FCE |
+| POST | `/api/afip/fecred-ctas-ctes` | Consultar cuentas corrientes FCE |
+| POST | `/api/afip/fecred-aceptar` | Aceptar FCE |
+| POST | `/api/afip/fecred-rechazar` | Rechazar FCE |
+| GET | `/api/afip/mtxca-status` | Estado WSMTXCA |
+| POST | `/api/afip/mtxca-autorizar` | Autorizar factura con detalle de artículos |
+| GET | `/api/afip/mtxca-ultimo-comprobante` | Último comprobante MTXCA |
+| GET | `/api/afip/sire-status` | Estado SIRE |
+| POST | `/api/afip/sire-retencion` | Registrar retención |
+| POST | `/api/afip/sire-consultar` | Consultar retenciones por período |
+| DELETE | `/api/afip/sire-anular/:nro` | Anular retención |
+| GET | `/api/afip/sire-regimenes` | Consultar regímenes |
+| GET | `/api/afip/agro-status` | Estado servicios agro (CPE/CTG/LPG) |
+| POST | `/api/afip/agro-cpe-autorizar` | Autorizar Carta de Porte |
+| POST | `/api/afip/agro-ctg-solicitar` | Solicitar CTG |
+| POST | `/api/afip/agro-lpg-autorizar` | Autorizar liquidación de granos |
+| POST | `/api/afip/empleados-generar` | Generar archivo F935 |
 
 ### AFIP — Certificados
 
