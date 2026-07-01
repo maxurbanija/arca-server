@@ -10,6 +10,16 @@
     "db:generate": "cd backend && npx prisma generate",
     "db:seed": "cd backend && npx prisma db seed",
     "db:studio": "cd backend && npx prisma studio",
-    "setup": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../backend && npx prisma generate"
+    "setup": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../backend && npx prisma generate",
+    "prepare": "husky",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.0.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.0.0",
+    "prettier": "^3.6.0"
   }
 }
