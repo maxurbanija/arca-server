@@ -63,6 +63,7 @@ Desde 2026-07-01 este fork (`maxurbanija/arca-server`, remote `fork`) usa un flu
 - **Lint**: `npm run lint` en `backend/` y `frontend/` (flat config, typescript-eslint). Las reglas del React Compiler (`react-hooks/set-state-in-effect`, `immutability`) están en `warn` porque el código legacy hace fetch-en-useEffect; la deuda es llevarlas a cero y subirlas a `error`.
 - **Formato**: Prettier con config compartida en la raíz (`.prettierrc.json`), calibrada al estilo preexistente (single quotes, 110 cols). **No se hizo reformat masivo** a propósito, para no complicar merges con el upstream — el formato se aplica solo a archivos tocados, vía lint-staged.
 - **CI**: `.github/workflows/ci.yml` corre lint + tests + build de ambos paquetes en push/PR a `main`/`develop`. Nada se mergea en rojo. Ojo: en un fork nuevo GitHub deja Actions deshabilitado hasta habilitarlo a mano en la pestaña Actions.
+- **Subagentes** (`.claude/agents/`): `backend-dev` y `frontend-dev` desarrollan en **worktrees aislados** (salen del HEAD local por `worktree.baseRef: head` en `.claude/settings.json`; `.worktreeinclude` les copia `backend/.env` y `backend/certs/`, que no están en git); `qa` es read-only, corre las suites en background sobre el checkout principal y distingue regresiones de warnings preexistentes. Se invocan con `@agent-<nombre>` en el chat o pidiéndole al asistente que los lance (pueden correr varios en paralelo).
 
 ## Decisiones de setup
 
