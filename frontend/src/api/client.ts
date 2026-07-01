@@ -89,12 +89,15 @@ export async function getClients(params?: {
   search?: string;
 }) {
   const { data } = await api.get<{
-    clients: Client[];
-    total: number;
-    page: number;
-    totalPages: number;
+    data: Client[];
+    pagination: { page: number; total: number; totalPages: number };
   }>('/clients', { params });
-  return data;
+  return {
+    clients: data.data,
+    total: data.pagination.total,
+    page: data.pagination.page,
+    totalPages: data.pagination.totalPages,
+  };
 }
 
 export async function createClient(clientData: Partial<Client>) {
