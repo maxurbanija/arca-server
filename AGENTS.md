@@ -46,6 +46,16 @@ npm run dev           # vite, puerto 5173
 
 - **2026-07-01**: `npm audit fix` aplicado en backend y frontend (sin `--force`). Frontend quedó en 0 vulnerabilidades (se actualizaron `vite` 8.0→8.1, `react-router` 7.15+, `form-data`, `postcss`). Backend quedó con 4 dev-only que **no conviene forzar**: 3 son la cadena `prisma` (CLI) → `@prisma/dev` → `@hono/node-server`, cuyo "fix" es downgradear Prisma a 6.x (breaking, dirección equivocada); la otra es `esbuild@0.27.4` pineado por `tsx` y `vite`, con una vulnerabilidad del dev server propio de esbuild que ni tsx ni vitest usan. Revisitar cuando Prisma/tsx/vite publiquen updates.
 
+## Flujo de trabajo (branching)
+
+Desde 2026-07-01 este fork (`maxurbanija/arca-server`, remote `fork`) usa un flujo tipo git-flow simplificado:
+
+- **`main`**: estable. Refleja lo último publicable y es la base para sincronizar con el upstream (`origin` = `ramiidv/arca-server`, solo lectura).
+- **`develop`**: rama de integración. Todo el trabajo diario aterriza acá.
+- **Ramas de feature/fix**: salen de `develop` con nombre `feature/<descripcion-corta>` o `fix/<descripcion-corta>`, y vuelven a `develop` (idealmente vía PR en el fork, aunque sea self-review).
+- `develop` → `main` se mergea cuando hay un corte estable.
+- Los commits al upstream de ramiidv (si algún día se proponen) salen como PR desde el fork.
+
 ## Decisiones de setup
 
 - **2026-07-01**: Se optó por no levantar backend/frontend vía Docker en desarrollo local (solo Postgres) para tener hot-reload de verdad con `nodemon`/`vite`, siguiendo el flujo que ya describe el README en la sección "Instalación".
