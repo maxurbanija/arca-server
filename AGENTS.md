@@ -56,6 +56,14 @@ Desde 2026-07-01 este fork (`maxurbanija/arca-server`, remote `fork`) usa un flu
 - `develop` → `main` se mergea cuando hay un corte estable.
 - Los commits al upstream de ramiidv (si algún día se proponen) salen como PR desde el fork.
 
+### Convenciones y tooling (desde 2026-07-01)
+
+- **Commits**: [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `ci:`, `docs:`, `refactor:`, `test:`), validados por commitlint en el hook `commit-msg`. Los commits anteriores a esta fecha no siguen el formato.
+- **Hooks** (husky, se instalan con `npm install` en la raíz): `pre-commit` corre lint-staged (eslint --fix + prettier sobre lo staged, con config por paquete); `commit-msg` corre commitlint.
+- **Lint**: `npm run lint` en `backend/` y `frontend/` (flat config, typescript-eslint). Las reglas del React Compiler (`react-hooks/set-state-in-effect`, `immutability`) están en `warn` porque el código legacy hace fetch-en-useEffect; la deuda es llevarlas a cero y subirlas a `error`.
+- **Formato**: Prettier con config compartida en la raíz (`.prettierrc.json`), calibrada al estilo preexistente (single quotes, 110 cols). **No se hizo reformat masivo** a propósito, para no complicar merges con el upstream — el formato se aplica solo a archivos tocados, vía lint-staged.
+- **CI**: `.github/workflows/ci.yml` corre lint + tests + build de ambos paquetes en push/PR a `main`/`develop`. Nada se mergea en rojo. Ojo: en un fork nuevo GitHub deja Actions deshabilitado hasta habilitarlo a mano en la pestaña Actions.
+
 ## Decisiones de setup
 
 - **2026-07-01**: Se optó por no levantar backend/frontend vía Docker en desarrollo local (solo Postgres) para tener hot-reload de verdad con `nodemon`/`vite`, siguiendo el flujo que ya describe el README en la sección "Instalación".
