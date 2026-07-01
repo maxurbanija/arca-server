@@ -83,14 +83,22 @@ function processItemsForDB(items: InvoiceItemInput[]) {
   });
 }
 
+// @ramiidv/arca-facturacion descarta silenciosamente el `iva` de un LineItem que
+// también trae `exento: true` (gana `exento` por el orden del if/else if del SDK).
+// Todo LineItem que se manda al SDK debe armarse acá, sin `exento`, para que ese
+// conflicto no pueda ocurrir.
+function toLineItems(items: ReturnType<typeof processItemsForDB>): LineItem[] {
+  return items.map((item) => ({
+    neto: item.subtotal,
+    iva: item.ivaId,
+  }));
+}
+
 class InvoiceService {
   async createInvoice(data: CreateInvoiceInput) {
     const processedItems = processItemsForDB(data.items);
 
-    const lineItems: LineItem[] = processedItems.map((item) => ({
-      neto: item.subtotal,
-      iva: item.ivaId,
-    }));
+    const lineItems = toLineItems(processedItems);
 
     const concepto = data.concepto ?? Concepto.SERVICIOS;
     const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
@@ -212,10 +220,7 @@ class InvoiceService {
     }
 
     const processedItems = processItemsForDB(data.items);
-    const lineItems: LineItem[] = processedItems.map((item) => ({
-      neto: item.subtotal,
-      iva: item.ivaId,
-    }));
+    const lineItems = toLineItems(processedItems);
 
     const concepto = data.concepto ?? originalInvoice.concepto;
     const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
@@ -270,10 +275,7 @@ class InvoiceService {
     }
 
     const processedItems = processItemsForDB(data.items);
-    const lineItems: LineItem[] = processedItems.map((item) => ({
-      neto: item.subtotal,
-      iva: item.ivaId,
-    }));
+    const lineItems = toLineItems(processedItems);
 
     const concepto = data.concepto ?? originalInvoice.concepto;
     const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
