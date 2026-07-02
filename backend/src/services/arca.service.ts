@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { Arca } from '@ramiidv/arca-facturacion';
 import type { ArcaEvent } from '@ramiidv/arca-facturacion';
 import { ArcaPadron } from '@ramiidv/arca-padron';
@@ -38,12 +39,41 @@ function readCerts() {
 
 const cuit = config.afip.cuit;
 
+// El SDK cachea los tickets de WSAA solo en memoria y AFIP rechaza emitir otro
+// mientras el anterior siga vigente: cada reinicio del backend podía dejar wsfe
+// bloqueado hasta la expiración (~12h). Si existe certs/ta-<servicio>.json (no
+// versionado), se siembra el cache del SDK con ese ticket al bootear.
+function seedAccessTickets(arca: Arca) {
+  const services = ['wsfe'];
+  for (const service of services) {
+    const file = path.resolve(path.dirname(config.afip.certPath), `ta-${service}.json`);
+    if (!fs.existsSync(file)) continue;
+    try {
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+        token?: string;
+        sign?: string;
+        expirationTime?: string;
+      };
+      const expirationTime = new Date(raw.expirationTime ?? 0);
+      if (!raw.token || !raw.sign || expirationTime.getTime() - Date.now() < 5 * 60_000) continue;
+      const wsaa = (arca as unknown as { wsaa: { ticketCache: Map<string, unknown> } }).wsaa;
+      wsaa.ticketCache.set(service, { token: raw.token, sign: raw.sign, expirationTime });
+      console.log(`[ARCA] TA de ${service} sembrado desde ${file} (expira ${expirationTime.toISOString()})`);
+    } catch {
+      console.warn(`[ARCA] No se pudo sembrar el TA desde ${file} (archivo inválido)`);
+    }
+  }
+}
+
 function createAll(production?: boolean) {
   const { cert, key } = readCerts();
   const prod = production ?? config.afip.production;
 
+  const arca = new Arca({ cuit: Number(cuit), cert, key, production: prod, onEvent });
+  seedAccessTickets(arca);
+
   return {
-    arca: new Arca({ cuit: Number(cuit), cert, key, production: prod, onEvent }),
+    arca,
     padron: new ArcaPadron({ cuit, cert, key, production: prod }),
     cdc: new ArcaCdc({ cuit: Number(cuit), cert, key, production: prod }),
     fecred: new ArcaFecred({ cuit, cert, key, production: prod }),

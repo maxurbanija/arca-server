@@ -1,0 +1,40 @@
+diff --git a/node_modules/@ramiidv/arca-common/dist/soap-client.js b/node_modules/@ramiidv/arca-common/dist/soap-client.js
+index f8796dd..d880cc7 100644
+--- a/node_modules/@ramiidv/arca-common/dist/soap-client.js
++++ b/node_modules/@ramiidv/arca-common/dist/soap-client.js
+@@ -92,7 +92,7 @@ export async function soapCall(endpoint, bodyContent, opts) {
+     const headers = {
+         'Content-Type': 'text/xml; charset=utf-8',
+     };
+-    if (opts?.soapAction) {
++    if (opts?.soapAction !== undefined) {
+         headers['SOAPAction'] = `"${opts.soapAction}"`;
+     }
+     let lastError;
+@@ -123,11 +123,24 @@ export async function soapCall(endpoint, bodyContent, opts) {
+             const durationMs = Date.now() - startTime;
+             const responseText = await response.text();
+             if (!response.ok) {
++                let faultDetail = '';
++                try {
++                    const parsedErr = parseXml(responseText);
++                    const errEnvelope = getNestedValue(parsedErr, 'soapenv:Envelope', 'soap:Envelope', 'Envelope', 'S:Envelope');
++                    const errBody = errEnvelope ? getNestedValue(errEnvelope, 'soapenv:Body', 'soap:Body', 'Body', 'S:Body') : undefined;
++                    const fault = errBody ? getNestedValue(errBody, 'soapenv:Fault', 'soap:Fault', 'Fault', 'S:Fault') : undefined;
++                    const faultString = fault ? (fault['faultstring'] ?? fault['faultString']) : undefined;
++                    if (faultString)
++                        faultDetail = ` - ${faultString}`;
++                }
++                catch {
++                    // body no era XML parseable; se reporta solo el status
++                }
+                 if (isRetryable(undefined, response.status) && attempt < maxRetries) {
+-                    lastError = new ArcaSoapError(`HTTP ${response.status}: ${response.statusText}`, response.status);
++                    lastError = new ArcaSoapError(`HTTP ${response.status}: ${response.statusText}${faultDetail}`, response.status);
+                     continue;
+                 }
+-                const err = new ArcaSoapError(`HTTP ${response.status}: ${response.statusText}`, response.status);
++                const err = new ArcaSoapError(`HTTP ${response.status}: ${response.statusText}${faultDetail}`, response.status);
+                 onEvent?.({ type: 'request:error', endpoint, method: methodName, error: err });
+                 throw err;
+             }

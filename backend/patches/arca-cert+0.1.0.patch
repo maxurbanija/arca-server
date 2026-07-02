@@ -1,0 +1,40 @@
+diff --git a/node_modules/arca-cert/dist/cjs/http.js b/node_modules/arca-cert/dist/cjs/http.js
+index df7a291..7ac9a41 100644
+--- a/node_modules/arca-cert/dist/cjs/http.js
++++ b/node_modules/arca-cert/dist/cjs/http.js
+@@ -169,6 +169,7 @@ class HttpClient {
+                     'Content-Type': contentType,
+                     'Cookie': this.getCookieHeader(),
+                     'User-Agent': 'arca-cert/0.1.0',
++                    ...options?.headers,
+                 },
+                 body: body.toString(),
+                 redirect: 'manual',
+@@ -238,6 +239,7 @@ class HttpClient {
+     async postSoap(url, soapXml, soapAction) {
+         const result = await this.post(url, soapXml, {
+             contentType: 'text/xml; charset=utf-8',
++            headers: { 'SOAPAction': `"${soapAction}"` },
+         });
+         // Siempre intentar parsear SOAP Fault (puede venir en cualquier status)
+         const fault = parseSoapFault(result.body);
+diff --git a/node_modules/arca-cert/dist/esm/http.js b/node_modules/arca-cert/dist/esm/http.js
+index 24e0f33..28eaccb 100644
+--- a/node_modules/arca-cert/dist/esm/http.js
++++ b/node_modules/arca-cert/dist/esm/http.js
+@@ -162,6 +162,7 @@ export class HttpClient {
+                     'Content-Type': contentType,
+                     'Cookie': this.getCookieHeader(),
+                     'User-Agent': 'arca-cert/0.1.0',
++                    ...options?.headers,
+                 },
+                 body: body.toString(),
+                 redirect: 'manual',
+@@ -231,6 +232,7 @@ export class HttpClient {
+     async postSoap(url, soapXml, soapAction) {
+         const result = await this.post(url, soapXml, {
+             contentType: 'text/xml; charset=utf-8',
++            headers: { 'SOAPAction': `"${soapAction}"` },
+         });
+         // Siempre intentar parsear SOAP Fault (puede venir en cualquier status)
+         const fault = parseSoapFault(result.body);
