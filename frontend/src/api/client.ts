@@ -30,8 +30,8 @@ api.interceptors.response.use(
   },
 );
 
-// Todos los endpoints del backend (salvo GET /invoices, que es plano) responden
-// { success, data }: los helpers devuelven SIEMPRE el payload ya desenvuelto.
+// Todos los endpoints del backend responden { success, data } (los listados
+// agregan pagination): los helpers devuelven SIEMPRE el payload ya desenvuelto.
 interface Wrapped<T> {
   success: boolean;
   data: T;
@@ -47,12 +47,15 @@ export async function getInvoices(params?: {
   clientId?: number;
 }) {
   const { data } = await api.get<{
-    invoices: Invoice[];
-    total: number;
-    page: number;
-    totalPages: number;
+    data: Invoice[];
+    pagination: { page: number; total: number; totalPages: number };
   }>('/invoices', { params });
-  return data;
+  return {
+    invoices: data.data,
+    total: data.pagination.total,
+    page: data.pagination.page,
+    totalPages: data.pagination.totalPages,
+  };
 }
 
 export async function createInvoice(invoiceData: Record<string, unknown>) {
