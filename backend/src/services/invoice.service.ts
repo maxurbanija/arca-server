@@ -1,5 +1,5 @@
 import { Prisma } from '../generated/prisma/client';
-import { Arca, IVA_RATES, Concepto } from '@ramiidv/arca-facturacion';
+import { Arca, IVA_RATES, Concepto, DocTipo } from '@ramiidv/arca-facturacion';
 import type { FacturarOpts, LineItem, FacturaResult } from '@ramiidv/arca-facturacion';
 import { prisma } from '../lib/prisma';
 import { arca } from './arca.service';
@@ -18,6 +18,7 @@ interface CreateInvoiceInput {
   clientId?: number;
   docTipo: number;
   docNro: string;
+  condicionIva?: number;
   concepto?: number;
   puntoVenta: number;
   items: InvoiceItemInput[];
@@ -31,6 +32,7 @@ interface CreateNotaCreditoInput {
   originalInvoiceId: number;
   puntoVenta: number;
   concepto?: number;
+  condicionIva?: number;
   items: InvoiceItemInput[];
   fchServDesde?: string;
   fchServHasta?: string;
@@ -42,6 +44,7 @@ interface CreateNotaDebitoInput {
   originalInvoiceId: number;
   puntoVenta: number;
   concepto?: number;
+  condicionIva?: number;
   items: InvoiceItemInput[];
   fchServDesde?: string;
   fchServHasta?: string;
@@ -66,7 +69,10 @@ function processItemsForDB(items: InvoiceItemInput[]) {
   return items.map((item) => {
     const ivaRate = IVA_RATES[item.ivaId as keyof typeof IVA_RATES];
     if (ivaRate === undefined) {
-      throw new AppError(400, `Invalid IVA ID: ${item.ivaId}. Valid IDs: ${Object.keys(IVA_RATES).join(', ')}`);
+      throw new AppError(
+        400,
+        `Invalid IVA ID: ${item.ivaId}. Valid IDs: ${Object.keys(IVA_RATES).join(', ')}`,
+      );
     }
     const subtotal = roundTwo(item.quantity * item.unitPrice);
     const ivaAmount = roundTwo(subtotal * (ivaRate / 100));
@@ -94,12 +100,36 @@ function toLineItems(items: ReturnType<typeof processItemsForDB>): LineItem[] {
   }));
 }
 
+// La condición de IVA del receptor es obligatoria para AFIP desde abril 2026,
+// salvo consumidor final sin identificar (docTipo 99). Se resuelve: valor
+// explícito del body → ivaCondition del cliente asociado → error claro.
+async function resolveCondicionIva(
+  explicit: number | undefined,
+  clientId: number | null | undefined,
+  docTipo: number,
+): Promise<number | undefined> {
+  if (explicit != null) return explicit;
+  if (clientId != null) {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { ivaCondition: true },
+    });
+    if (client) return client.ivaCondition;
+  }
+  if (docTipo === DocTipo.CONSUMIDOR_FINAL) return undefined;
+  throw new AppError(
+    400,
+    'condicionIva es requerida para receptores identificados (obligatoria para AFIP desde abril 2026): enviala en el body o asociá un clientId con condición de IVA cargada.',
+  );
+}
+
 class InvoiceService {
   async createInvoice(data: CreateInvoiceInput) {
     const processedItems = processItemsForDB(data.items);
 
     const lineItems = toLineItems(processedItems);
 
+    const condicionIva = await resolveCondicionIva(data.condicionIva, data.clientId, data.docTipo);
     const concepto = data.concepto ?? Concepto.SERVICIOS;
     const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
     const today = Arca.formatDate(new Date());
@@ -111,6 +141,7 @@ class InvoiceService {
       concepto,
       docTipo: data.docTipo,
       docNro: Number(data.docNro),
+      condicionIva,
       ...(esServicio && {
         servicio: {
           desde: data.fchServDesde || today,
@@ -123,9 +154,10 @@ class InvoiceService {
     const result = await arca.facturar(opts);
 
     if (!result.aprobada) {
-      const obsMsg = result.observaciones.length > 0
-        ? result.observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ')
-        : 'Unknown reason';
+      const obsMsg =
+        result.observaciones.length > 0
+          ? result.observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ')
+          : 'Unknown reason';
       throw new AppError(400, `AFIP rejected invoice: ${obsMsg}`);
     }
 
@@ -222,6 +254,11 @@ class InvoiceService {
     const processedItems = processItemsForDB(data.items);
     const lineItems = toLineItems(processedItems);
 
+    const condicionIva = await resolveCondicionIva(
+      data.condicionIva,
+      originalInvoice.clientId,
+      originalInvoice.docTipo,
+    );
     const concepto = data.concepto ?? originalInvoice.concepto;
     const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
     const today = Arca.formatDate(new Date());
@@ -237,6 +274,7 @@ class InvoiceService {
       concepto,
       docTipo: originalInvoice.docTipo,
       docNro: Number(originalInvoice.docNro),
+      condicionIva,
       ...(esServicio && {
         servicio: {
           desde: data.fchServDesde || today,
@@ -277,6 +315,11 @@ class InvoiceService {
     const processedItems = processItemsForDB(data.items);
     const lineItems = toLineItems(processedItems);
 
+    const condicionIva = await resolveCondicionIva(
+      data.condicionIva,
+      originalInvoice.clientId,
+      originalInvoice.docTipo,
+    );
     const concepto = data.concepto ?? originalInvoice.concepto;
     const esServicio = concepto === Concepto.SERVICIOS || concepto === Concepto.PRODUCTOS_Y_SERVICIOS;
     const today = Arca.formatDate(new Date());
@@ -292,6 +335,7 @@ class InvoiceService {
       concepto,
       docTipo: originalInvoice.docTipo,
       docNro: Number(originalInvoice.docNro),
+      condicionIva,
       ...(esServicio && {
         servicio: {
           desde: data.fchServDesde || today,
@@ -332,9 +376,10 @@ class InvoiceService {
     },
   ) {
     if (!result.aprobada) {
-      const obsMsg = result.observaciones.length > 0
-        ? result.observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ')
-        : 'Unknown reason';
+      const obsMsg =
+        result.observaciones.length > 0
+          ? result.observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ')
+          : 'Unknown reason';
       throw new AppError(400, `AFIP rejected comprobante: ${obsMsg}`);
     }
 

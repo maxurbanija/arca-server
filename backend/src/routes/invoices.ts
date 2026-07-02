@@ -14,6 +14,7 @@ const createInvoiceSchema = z.object({
   clientId: z.number().int().positive().optional(),
   docTipo: z.number().int().min(0),
   docNro: z.string().min(1, 'docNro is required'),
+  condicionIva: z.number().int().positive().optional(),
   concepto: z.number().int().min(1).max(3).default(2),
   puntoVenta: z.number().int().positive(),
   items: z
@@ -25,12 +26,21 @@ const createInvoiceSchema = z.object({
         ivaId: z.number().refine((v) => (VALID_IVA_IDS as readonly number[]).includes(v), {
           message: `ivaId must be one of: ${VALID_IVA_IDS.join(', ')}`,
         }),
-      })
+      }),
     )
     .min(1, 'At least one item is required'),
-  fchServDesde: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
-  fchServHasta: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
-  fchVtoPago: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  fchServDesde: z
+    .string()
+    .regex(/^\d{8}$/, 'Date must be YYYYMMDD format')
+    .optional(),
+  fchServHasta: z
+    .string()
+    .regex(/^\d{8}$/, 'Date must be YYYYMMDD format')
+    .optional(),
+  fchVtoPago: z
+    .string()
+    .regex(/^\d{8}$/, 'Date must be YYYYMMDD format')
+    .optional(),
   observations: z.string().optional(),
 });
 
@@ -53,6 +63,7 @@ const createNotaCreditoSchema = z.object({
   originalInvoiceId: z.number().int().positive(),
   puntoVenta: z.number().int().positive(),
   concepto: z.number().int().min(1).max(3).optional(),
+  condicionIva: z.number().int().positive().optional(),
   items: z
     .array(
       z.object({
@@ -62,12 +73,21 @@ const createNotaCreditoSchema = z.object({
         ivaId: z.number().refine((v) => (VALID_IVA_IDS as readonly number[]).includes(v), {
           message: `ivaId must be one of: ${VALID_IVA_IDS.join(', ')}`,
         }),
-      })
+      }),
     )
     .min(1, 'At least one item is required'),
-  fchServDesde: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
-  fchServHasta: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
-  fchVtoPago: z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD format').optional(),
+  fchServDesde: z
+    .string()
+    .regex(/^\d{8}$/, 'Date must be YYYYMMDD format')
+    .optional(),
+  fchServHasta: z
+    .string()
+    .regex(/^\d{8}$/, 'Date must be YYYYMMDD format')
+    .optional(),
+  fchVtoPago: z
+    .string()
+    .regex(/^\d{8}$/, 'Date must be YYYYMMDD format')
+    .optional(),
   observations: z.string().optional(),
 });
 
