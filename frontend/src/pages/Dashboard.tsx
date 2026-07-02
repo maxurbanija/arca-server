@@ -13,7 +13,7 @@ import { getInvoiceStats, getInvoices, getAfipStatus } from '../api/client';
 import type { Invoice, InvoiceStats } from '../types';
 import { formatCurrency, formatDate, formatCbteTipo, formatFullInvoiceNumber } from '../utils/formatters';
 import InvoiceStatusBadge from '../components/InvoiceStatusBadge';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth-context';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -88,9 +88,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold text-gray-900">
             {greeting()}, {user?.name?.split(' ')[0]}
           </h2>
-          <p className="mt-0.5 text-sm text-gray-500">
-            Resumen de tu actividad de facturación
-          </p>
+          <p className="mt-0.5 text-sm text-gray-500">Resumen de tu actividad de facturación</p>
         </div>
 
         {afipStatus && (
@@ -186,9 +184,7 @@ export default function Dashboard() {
           {recentInvoices.length === 0 ? (
             <div className="empty-state py-10">
               <DocumentTextIcon className="h-10 w-10 text-gray-300" />
-              <p className="mt-3 text-sm text-gray-500">
-                No hay facturas registradas
-              </p>
+              <p className="mt-3 text-sm text-gray-500">No hay facturas registradas</p>
               <Link to="/facturas/nueva" className="btn-primary mt-4 text-xs">
                 Crear primera factura
               </Link>
@@ -198,30 +194,46 @@ export default function Dashboard() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="px-4 sm:px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Tipo</th>
-                    <th className="hidden sm:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Número</th>
-                    <th className="hidden sm:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Fecha</th>
-                    <th className="hidden md:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Cliente</th>
-                    <th className="px-4 sm:px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total</th>
-                    <th className="px-4 sm:px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Estado</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Tipo
+                    </th>
+                    <th className="hidden sm:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Número
+                    </th>
+                    <th className="hidden sm:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Fecha
+                    </th>
+                    <th className="hidden md:table-cell px-6 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Cliente
+                    </th>
+                    <th className="px-4 sm:px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Total
+                    </th>
+                    <th className="px-4 sm:px-6 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Estado
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {recentInvoices.map((inv) => (
-                    <tr
-                      key={inv.id}
-                      className="cursor-pointer transition-colors hover:bg-gray-50/50"
-                    >
+                    <tr key={inv.id} className="cursor-pointer transition-colors hover:bg-gray-50/50">
                       <td className="px-4 sm:px-6 py-2.5 text-sm">
-                        <Link to={`/facturas/${inv.id}`} className="font-medium text-indigo-600 hover:text-indigo-700">
+                        <Link
+                          to={`/facturas/${inv.id}`}
+                          className="font-medium text-indigo-600 hover:text-indigo-700"
+                        >
                           {formatCbteTipo(inv.cbteTipo)}
                         </Link>
                       </td>
                       <td className="hidden sm:table-cell px-6 py-2.5 font-mono text-xs text-gray-500">
                         {formatFullInvoiceNumber(inv.puntoVenta, inv.cbteNro)}
                       </td>
-                      <td className="hidden sm:table-cell px-6 py-2.5 text-sm text-gray-500">{formatDate(inv.cbteFch)}</td>
-                      <td className="hidden md:table-cell px-6 py-2.5 text-sm text-gray-600">{inv.client?.name || inv.docNro}</td>
+                      <td className="hidden sm:table-cell px-6 py-2.5 text-sm text-gray-500">
+                        {formatDate(inv.cbteFch)}
+                      </td>
+                      <td className="hidden md:table-cell px-6 py-2.5 text-sm text-gray-600">
+                        {inv.client?.name || inv.docNro}
+                      </td>
                       <td className="px-4 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">
                         {formatCurrency(inv.impTotal)}
                       </td>
@@ -247,14 +259,10 @@ export default function Dashboard() {
                   className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2.5 transition-colors hover:bg-gray-50"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {formatCbteTipo(item.cbteTipo)}
-                    </p>
+                    <p className="text-sm font-medium text-gray-800">{formatCbteTipo(item.cbteTipo)}</p>
                     <p className="text-[11px] text-gray-400">{item.count} comprobantes</p>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(item.total)}
-                  </p>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.total)}</p>
                 </div>
               ))}
             </div>

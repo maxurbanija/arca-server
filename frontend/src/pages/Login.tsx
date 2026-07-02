@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth-context';
 import toast from 'react-hot-toast';
 import { DocumentTextIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
@@ -49,14 +49,8 @@ export default function Login() {
         </div>
 
         {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl bg-white p-8 shadow-2xl"
-          noValidate
-        >
-          <h2 className="mb-6 text-center text-xl font-semibold text-gray-900">
-            Iniciar Sesion
-          </h2>
+        <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-8 shadow-2xl" noValidate>
+          <h2 className="mb-6 text-center text-xl font-semibold text-gray-900">Iniciar Sesion</h2>
 
           <div className="space-y-4">
             <div>
@@ -96,11 +90,7 @@ export default function Login() {
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
+                  {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
             </div>

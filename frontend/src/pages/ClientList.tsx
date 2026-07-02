@@ -24,7 +24,6 @@ export default function ClientList() {
 
   const loadClients = async () => {
     try {
-      setLoading(true);
       const params: { page: number; limit: number; search?: string } = {
         page,
         limit: 20,
@@ -59,10 +58,12 @@ export default function ClientList() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setSearchParams({ page: '1' });
   };
 
   const goToPage = (p: number) => {
+    setLoading(true);
     setSearchParams({ page: String(p) });
   };
 
@@ -121,18 +122,12 @@ export default function ClientList() {
                 {clients.map((client) => (
                   <tr key={client.id} className="transition-colors hover:bg-gray-50">
                     <td className="table-cell font-medium">{client.name}</td>
-                    <td className="table-cell">
-                      {DOC_TIPOS[client.docType] || client.docType}
-                    </td>
-                    <td className="table-cell font-mono text-xs">
-                      {client.docNumber}
-                    </td>
+                    <td className="table-cell">{DOC_TIPOS[client.docType] || client.docType}</td>
+                    <td className="table-cell font-mono text-xs">{client.docNumber}</td>
                     <td className="table-cell">
                       {IVA_CONDITIONS[client.ivaCondition] || client.ivaCondition}
                     </td>
-                    <td className="table-cell text-center">
-                      {client._count?.invoices ?? 0}
-                    </td>
+                    <td className="table-cell text-center">{client._count?.invoices ?? 0}</td>
                     <td className="table-cell">
                       <div className="flex gap-2">
                         <Link
@@ -166,11 +161,7 @@ export default function ClientList() {
             Pagina {page} de {totalPages}
           </p>
           <div className="flex gap-2">
-            <button
-              onClick={() => goToPage(page - 1)}
-              disabled={page <= 1}
-              className="btn-secondary text-xs"
-            >
+            <button onClick={() => goToPage(page - 1)} disabled={page <= 1} className="btn-secondary text-xs">
               Anterior
             </button>
             <button

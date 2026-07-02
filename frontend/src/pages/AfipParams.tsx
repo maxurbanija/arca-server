@@ -44,7 +44,7 @@ export default function AfipParams() {
     tributos: [],
   });
   const [loading, setLoading] = useState<Record<TabKey, boolean>>({
-    comprobantes: false,
+    comprobantes: true,
     documentos: false,
     iva: false,
     condiciones: false,
@@ -58,7 +58,6 @@ export default function AfipParams() {
   const fetchTab = async (tab: TabKey) => {
     if (data[tab].length > 0) return; // Already loaded
 
-    setLoading((prev) => ({ ...prev, [tab]: true }));
     try {
       let result: ParamItem[];
       switch (tab) {
@@ -120,7 +119,10 @@ export default function AfipParams() {
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => {
+                if (data[tab.key].length === 0) setLoading((prev) => ({ ...prev, [tab.key]: true }));
+                setActiveTab(tab.key);
+              }}
               className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -140,19 +142,29 @@ export default function AfipParams() {
             <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-indigo-600 border-t-transparent" />
           </div>
         ) : items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400">Sin datos. Conectá los certificados AFIP para cargar.</p>
+          <p className="py-8 text-center text-sm text-gray-400">
+            Sin datos. Conectá los certificados AFIP para cargar.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">ID</th>
-                  <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Descripción</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                    ID
+                  </th>
+                  <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                    Descripción
+                  </th>
                   {items[0]?.FchDesde !== undefined && (
-                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">Vigencia</th>
+                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Vigencia
+                    </th>
                   )}
                   {activeTab === 'monedas' && (
-                    <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">Cotización</th>
+                    <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Cotización
+                    </th>
                   )}
                 </tr>
               </thead>
@@ -193,13 +205,9 @@ export default function AfipParams() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-indigo-600">Cotización Oficial AFIP</p>
-              <p className="mt-0.5 text-2xl font-bold text-indigo-900">
-                ${cotizacion.MonCotiz}
-              </p>
+              <p className="mt-0.5 text-2xl font-bold text-indigo-900">${cotizacion.MonCotiz}</p>
             </div>
-            <p className="text-xs text-indigo-400">
-              Fecha: {cotizacion.FchCotiz}
-            </p>
+            <p className="text-xs text-indigo-400">Fecha: {cotizacion.FchCotiz}</p>
           </div>
         </div>
       )}

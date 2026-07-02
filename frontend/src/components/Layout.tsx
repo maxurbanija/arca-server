@@ -1,12 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import {
-  Bars3Icon,
-  ArrowRightOnRectangleIcon,
-  ChevronDownIcon,
-} from '@heroicons/react/24/outline';
+import { Bars3Icon, ArrowRightOnRectangleIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth-context';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -65,9 +61,7 @@ export default function Layout() {
             >
               <Bars3Icon className="h-5 w-5" aria-hidden="true" />
             </button>
-            <h1 className="text-sm font-semibold text-gray-800">
-              {getPageTitle()}
-            </h1>
+            <h1 className="text-sm font-semibold text-gray-800">{getPageTitle()}</h1>
           </div>
 
           {/* User menu */}

@@ -15,7 +15,12 @@ export default function Settings() {
   const [checkingStatus, setCheckingStatus] = useState(false);
 
   // Cert info
-  const [certInfo, setCertInfo] = useState<{ notBefore: string; notAfter: string; daysLeft: number; expired: boolean } | null>(null);
+  const [certInfo, setCertInfo] = useState<{
+    notBefore: string;
+    notAfter: string;
+    daysLeft: number;
+    expired: boolean;
+  } | null>(null);
   const [loadingCertInfo, setLoadingCertInfo] = useState(true);
 
   // Cert generation
@@ -31,13 +36,8 @@ export default function Settings() {
   const [testingCert, setTestingCert] = useState(false);
   const [testResult, setTestResult] = useState<{ valid: boolean; message: string } | null>(null);
 
-  useEffect(() => {
-    loadCertInfo();
-  }, []);
-
   const loadCertInfo = async () => {
     try {
-      setLoadingCertInfo(true);
       const result = await getCertInfo();
       setCertInfo(result);
     } catch {
@@ -46,6 +46,10 @@ export default function Settings() {
       setLoadingCertInfo(false);
     }
   };
+
+  useEffect(() => {
+    loadCertInfo();
+  }, []);
 
   const checkStatus = async () => {
     try {
@@ -82,6 +86,7 @@ export default function Settings() {
       setCertResult(result);
       setCertPassword('');
       toast.success(certAction === 'renew' ? 'Certificado renovado' : 'Certificado generado');
+      setLoadingCertInfo(true);
       loadCertInfo();
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, 'Error al generar el certificado'), { duration: 8000 });
@@ -119,9 +124,16 @@ export default function Settings() {
               <p className="text-xs text-gray-500">Estado del certificado instalado</p>
             </div>
           </div>
-          <button onClick={handleTestCert} disabled={testingCert || loadingCertInfo} className="btn-secondary text-xs">
+          <button
+            onClick={handleTestCert}
+            disabled={testingCert || loadingCertInfo}
+            className="btn-secondary text-xs"
+          >
             {testingCert ? (
-              <><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" /> Verificando...</>
+              <>
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />{' '}
+                Verificando...
+              </>
             ) : (
               'Verificar con WSAA'
             )}
@@ -137,39 +149,60 @@ export default function Settings() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-gray-100 px-3 py-2.5">
                 <p className="text-[11px] text-gray-400">Válido desde</p>
-                <p className="text-sm font-medium">{new Date(certInfo.notBefore).toLocaleDateString('es-AR')}</p>
+                <p className="text-sm font-medium">
+                  {new Date(certInfo.notBefore).toLocaleDateString('es-AR')}
+                </p>
               </div>
               <div className="rounded-lg border border-gray-100 px-3 py-2.5">
                 <p className="text-[11px] text-gray-400">Vence</p>
-                <p className="text-sm font-medium">{new Date(certInfo.notAfter).toLocaleDateString('es-AR')}</p>
+                <p className="text-sm font-medium">
+                  {new Date(certInfo.notAfter).toLocaleDateString('es-AR')}
+                </p>
               </div>
-              <div className={`rounded-lg border px-3 py-2.5 ${
-                certInfo.expired ? 'border-red-200 bg-red-50' :
-                certInfo.daysLeft < 30 ? 'border-amber-200 bg-amber-50' :
-                'border-emerald-200 bg-emerald-50'
-              }`}>
+              <div
+                className={`rounded-lg border px-3 py-2.5 ${
+                  certInfo.expired
+                    ? 'border-red-200 bg-red-50'
+                    : certInfo.daysLeft < 30
+                      ? 'border-amber-200 bg-amber-50'
+                      : 'border-emerald-200 bg-emerald-50'
+                }`}
+              >
                 <p className="text-[11px] text-gray-400">Estado</p>
                 <div className="flex items-center gap-1.5">
                   {certInfo.expired ? (
-                    <><ExclamationTriangleIcon className="h-4 w-4 text-red-500" /><span className="text-sm font-semibold text-red-700">Expirado</span></>
+                    <>
+                      <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-semibold text-red-700">Expirado</span>
+                    </>
                   ) : certInfo.daysLeft < 30 ? (
-                    <><ClockIcon className="h-4 w-4 text-amber-500" /><span className="text-sm font-semibold text-amber-700">{certInfo.daysLeft} días</span></>
+                    <>
+                      <ClockIcon className="h-4 w-4 text-amber-500" />
+                      <span className="text-sm font-semibold text-amber-700">{certInfo.daysLeft} días</span>
+                    </>
                   ) : (
-                    <><CheckCircleIcon className="h-4 w-4 text-emerald-500" /><span className="text-sm font-semibold text-emerald-700">{certInfo.daysLeft} días</span></>
+                    <>
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-semibold text-emerald-700">{certInfo.daysLeft} días</span>
+                    </>
                   )}
                 </div>
               </div>
             </div>
 
             {testResult && (
-              <div className={`rounded-lg border px-3 py-2.5 ${testResult.valid ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+              <div
+                className={`rounded-lg border px-3 py-2.5 ${testResult.valid ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
+              >
                 <div className="flex items-center gap-2">
                   {testResult.valid ? (
                     <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
                   ) : (
                     <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
                   )}
-                  <p className={`text-sm font-medium ${testResult.valid ? 'text-emerald-700' : 'text-red-700'}`}>
+                  <p
+                    className={`text-sm font-medium ${testResult.valid ? 'text-emerald-700' : 'text-red-700'}`}
+                  >
                     {testResult.message}
                   </p>
                 </div>
@@ -178,7 +211,9 @@ export default function Settings() {
 
             {(certInfo.expired || certInfo.daysLeft < 30) && (
               <p className="text-xs text-amber-600">
-                {certInfo.expired ? 'El certificado expiró. Generá o renová uno nuevo.' : 'El certificado vence pronto. Considerá renovarlo.'}
+                {certInfo.expired
+                  ? 'El certificado expiró. Generá o renová uno nuevo.'
+                  : 'El certificado vence pronto. Considerá renovarlo.'}
               </p>
             )}
           </div>
@@ -215,25 +250,49 @@ export default function Settings() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label">CUIT</label>
-              <input type="text" value={certCuit} onChange={(e) => setCertCuit(e.target.value)} className="input" placeholder="20123456789" />
+              <input
+                type="text"
+                value={certCuit}
+                onChange={(e) => setCertCuit(e.target.value)}
+                className="input"
+                placeholder="20123456789"
+              />
             </div>
             <div>
               <label className="label">Clave Fiscal</label>
-              <input type="password" value={certPassword} onChange={(e) => setCertPassword(e.target.value)} className="input" placeholder="Tu clave fiscal de AFIP" />
+              <input
+                type="password"
+                value={certPassword}
+                onChange={(e) => setCertPassword(e.target.value)}
+                className="input"
+                placeholder="Tu clave fiscal de AFIP"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label">Alias del Certificado</label>
-              <input type="text" value={certAlias} onChange={(e) => setCertAlias(e.target.value)} className="input" placeholder="mi-sistema" />
+              <input
+                type="text"
+                value={certAlias}
+                onChange={(e) => setCertAlias(e.target.value)}
+                className="input"
+                placeholder="mi-sistema"
+              />
               {certAction === 'renew' && (
-                <p className="mt-1 text-[11px] text-gray-400">Se generará un alias nuevo con sufijo temporal</p>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Se generará un alias nuevo con sufijo temporal
+                </p>
               )}
             </div>
             <div>
               <label className="label">Entorno</label>
-              <select value={certEnv} onChange={(e) => setCertEnv(e.target.value as 'testing' | 'production')} className="select">
+              <select
+                value={certEnv}
+                onChange={(e) => setCertEnv(e.target.value as 'testing' | 'production')}
+                className="select"
+              >
                 <option value="production">Producción</option>
                 <option value="testing">Homologación (Testing)</option>
               </select>
@@ -243,7 +302,10 @@ export default function Settings() {
           <div className="flex items-center gap-3">
             <button onClick={handleGenerateCert} disabled={generatingCert} className="btn-primary">
               {generatingCert ? (
-                <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generando...</>
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />{' '}
+                  Generando...
+                </>
               ) : certAction === 'renew' ? (
                 'Renovar Certificado'
               ) : (
@@ -275,9 +337,13 @@ export default function Settings() {
           <h3 className="text-base font-semibold text-gray-900">Estado de AFIP</h3>
           <button onClick={checkStatus} disabled={checkingStatus} className="btn-secondary text-xs">
             {checkingStatus ? (
-              <><ArrowPathIcon className="h-4 w-4 animate-spin" /> Verificando...</>
+              <>
+                <ArrowPathIcon className="h-4 w-4 animate-spin" /> Verificando...
+              </>
             ) : (
-              <><ArrowPathIcon className="h-4 w-4" /> Verificar</>
+              <>
+                <ArrowPathIcon className="h-4 w-4" /> Verificar
+              </>
             )}
           </button>
         </div>
@@ -285,20 +351,33 @@ export default function Settings() {
         {afipStatus ? (
           <div className="space-y-2">
             {['AppServer', 'DbServer', 'AuthServer'].map((server) => (
-              <div key={server} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2.5">
+              <div
+                key={server}
+                className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2.5"
+              >
                 <span className="text-sm font-medium text-gray-700">{server}</span>
                 <span className="flex items-center gap-1.5">
                   {afipStatus[server] === 'OK' ? (
-                    <><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /><span className="text-xs font-medium text-emerald-700">OK</span></>
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-700">OK</span>
+                    </>
                   ) : (
-                    <><span className="h-1.5 w-1.5 rounded-full bg-red-400" /><span className="text-xs font-medium text-red-700">{afipStatus[server] || 'Error'}</span></>
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                      <span className="text-xs font-medium text-red-700">
+                        {afipStatus[server] || 'Error'}
+                      </span>
+                    </>
                   )}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-4 text-center text-sm text-gray-400">Hacé clic en "Verificar" para comprobar la conexión con AFIP</p>
+          <p className="py-4 text-center text-sm text-gray-400">
+            Hacé clic en "Verificar" para comprobar la conexión con AFIP
+          </p>
         )}
       </div>
 

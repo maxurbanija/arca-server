@@ -18,9 +18,11 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // Reglas del React Compiler degradadas a warning: marcan patrones legacy
-      // (fetch en useEffect con setState sincrónico) cuyo arreglo es un refactor
-      // aparte, no parte del setup de tooling. Ir llevándolas a cero.
+      // Reglas del React Compiler degradadas a warning. Las que quedan exigen
+      // cambios de arquitectura: los loaders llamados desde useEffect requieren
+      // una data library (TanStack Query) o use(), y los warnings de
+      // react-hook-form requieren migrar watch() a useWatch. Subir a error
+      // cuando se haga ese refactor.
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/immutability': 'warn',
       'react-refresh/only-export-components': 'warn',
