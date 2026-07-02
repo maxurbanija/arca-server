@@ -110,8 +110,10 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       INVALID_CUIT: 400,
       INVALID_ALIAS: 400,
       INVALID_SERVICE: 400,
-      LOGIN_FAILED: 401,
-      SESSION_EXPIRED: 401,
+      // Credenciales/sesión del PORTAL de AFIP, no de la app: nunca 401,
+      // porque el interceptor del frontend desloguea ante cualquier 401.
+      LOGIN_FAILED: 422,
+      SESSION_EXPIRED: 422,
       PORTAL_ERROR: 502,
       WSAA_ERROR: 502,
       WSASS_ERROR: 502,
