@@ -27,7 +27,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     return Promise.reject(err);
-  }
+  },
 );
 
 // Invoices
@@ -83,11 +83,7 @@ export async function getInvoiceStats() {
 }
 
 // Clients
-export async function getClients(params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-}) {
+export async function getClients(params?: { page?: number; limit?: number; search?: string }) {
   const { data } = await api.get<{
     data: Client[];
     pagination: { page: number; total: number; totalPages: number };
@@ -134,14 +130,36 @@ export async function getLastVoucher(puntoVenta: number, cbteTipo: number) {
 }
 
 export async function getPuntosVenta() {
-  const { data } = await api.get<{ Nro: number; EmisionTipo: string; Bloqueado: string; FchBaja: string }[]>(
-    '/afip/puntos-venta'
-  );
+  const { data } =
+    await api.get<{ Nro: number; EmisionTipo: string; Bloqueado: string; FchBaja: string }[]>(
+      '/afip/puntos-venta',
+    );
   return data;
 }
 
+interface DomicilioPadron {
+  direccion?: string;
+  calle?: string;
+  localidad?: string;
+  codPostal?: string;
+  codigoPostal?: string;
+  provincia?: string;
+  descripcionProvincia?: string;
+}
+
+// El shape varía entre el SDK viejo y arca-padron; se tipan solo los campos que usa la UI.
+export interface PersonaPadron {
+  nombre?: string;
+  apellido?: string;
+  razonSocial?: string;
+  domicilios?: DomicilioPadron[];
+  domicilioFiscal?: DomicilioPadron;
+  impuestos?: { id?: number; idImpuesto?: number }[];
+  [key: string]: unknown;
+}
+
 export async function consultarCuit(cuit: number | string) {
-  const { data } = await api.get<Record<string, any>>(`/afip/contribuyente/${cuit}`);
+  const { data } = await api.get<PersonaPadron>(`/afip/contribuyente/${cuit}`);
   return data;
 }
 
@@ -222,12 +240,22 @@ export async function getAfipOptionalTypes() {
   return data;
 }
 
-export async function generateCert(data: { cuit: string; password: string; alias: string; environment?: string }) {
+export async function generateCert(data: {
+  cuit: string;
+  password: string;
+  alias: string;
+  environment?: string;
+}) {
   const { data: result } = await api.post('/afip/generate-cert', data, { timeout: 120000 });
   return result;
 }
 
-export async function renewCert(data: { cuit: string; password: string; alias: string; environment?: string }) {
+export async function renewCert(data: {
+  cuit: string;
+  password: string;
+  alias: string;
+  environment?: string;
+}) {
   const { data: result } = await api.post('/afip/renew-cert', data, { timeout: 120000 });
   return result;
 }

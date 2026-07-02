@@ -63,7 +63,9 @@ export function reloadArca(production?: boolean) {
 
 function proxy<T extends object>(getter: () => T): T {
   return new Proxy({} as T, {
-    get(_target, prop) { return (getter() as any)[prop]; },
+    get(_target, prop) {
+      return (getter() as Record<PropertyKey, unknown>)[prop];
+    },
   });
 }
 

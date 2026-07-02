@@ -15,12 +15,7 @@ export class AppError extends Error {
   }
 }
 
-export function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction
-): void {
+export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   console.error('[Error]', err.message);
 
   if (err instanceof AppError) {
@@ -33,7 +28,7 @@ export function errorHandler(
 
   // Prisma known errors
   if (err.constructor?.name === 'PrismaClientKnownRequestError') {
-    const prismaErr = err as any;
+    const prismaErr = err as Error & { code?: string };
     if (prismaErr.code === 'P2002') {
       res.status(409).json({
         success: false,
@@ -146,11 +141,12 @@ export function errorHandler(
 
   // Zod validation errors
   if (err.constructor?.name === 'ZodError') {
-    const zodErr = err as any;
+    // zod 4 expone los detalles en .issues (.errors era el alias de zod 3)
+    const zodErr = err as Error & { issues?: unknown };
     res.status(400).json({
       success: false,
       error: 'Validation error',
-      details: zodErr.errors,
+      details: zodErr.issues,
     });
     return;
   }
